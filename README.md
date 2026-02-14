@@ -1,40 +1,36 @@
 # Uptime Monitor - 服务监控系统
 
-一个类似 UptimeRobot 的服务监控系统，支持 HTTP/HTTPS、TCP 端口和 PING 监控，提供实时状态更新和可视化统计。
+一个类似 UptimeRobot 的服务监控系统，支持 HTTP/HTTPS、TCP 端口和 PING 监控，提供实时状态更新、可视化统计和公开状态页展示。
 
 ## 功能特性
 
-- ✅ **多种监控类型**
-  - HTTP/HTTPS 网站和 API 监控
-  - TCP 端口连接检测
-  - PING 网络可达性检测
+### 监控功能
+- ✅ **多种监控类型**：HTTP/HTTPS、TCP 端口、PING 网络检测
+- ✅ **实时监控**：自定义检测间隔（最低 10 秒），实时状态推送
+- ✅ **故障检测**：自动故障检测、记录和通知
+- ✅ **数据可视化**：响应时间趋势图、可用率统计（24h/7d/30d）、故障事件时间线
 
-- ✅ **实时监控**
-  - 自定义检测间隔（最低 10 秒）
-  - 实时状态推送（Socket.io）
-  - 自动故障检测和记录
+### 状态页功能
+- ✅ **公开状态页**：创建可公开访问的服务状态页面
+- ✅ **自定义配置**：支持自定义名称、描述、Logo
+- ✅ **30天热力图**：展示服务历史可用率
+- ✅ **实时更新**：自动同步最新监控状态
 
-- ✅ **数据可视化**
-  - 实时状态仪表盘
-  - 响应时间趋势图
-  - 可用率统计（24h/7d/30d）
-  - 故障事件时间线
-
-- ✅ **灵活配置**
-  - 支持启用/禁用监控项
-  - 自定义超时时间
-  - HTTP 请求方法和期望状态码配置
-  - 数据自动清理（可配置保留天数）
+### 用户与权限
+- ✅ **三级权限**：管理员、普通用户、访客
+- ✅ **用户管理**：管理员可创建、编辑、删除用户
+- ✅ **权限控制**：基于角色的访问控制（RBAC）
 
 ## 技术栈
 
 ### 后端
-- **Node.js** - 运行时环境
+- **Node.js** v18+ - 运行时环境
 - **Express.js** - Web 框架
-- **SQLite3** (better-sqlite3) - 数据库
+- **sql.js** - SQLite 数据库
 - **Socket.io** - 实时通信
-- **Axios** - HTTP 请求
 - **node-cron** - 定时任务调度
+- **jsonwebtoken** - JWT 认证
+- **bcryptjs** - 密码加密
 - **Joi** - 数据验证
 
 ### 前端
@@ -45,209 +41,114 @@
 - **Vue Router** - 路由管理
 - **ECharts** - 数据可视化
 - **Socket.io-client** - 实时通信
-- **Axios** - HTTP 请求
-
-## 项目结构
-
-```
-Uptime/
-├── backend/                    # 后端服务
-│   ├── src/
-│   │   ├── config/            # 配置文件
-│   │   ├── controllers/       # 控制器
-│   │   ├── models/            # 数据模型
-│   │   ├── services/          # 业务逻辑
-│   │   ├── routes/            # 路由定义
-│   │   ├── jobs/              # 定时任务
-│   │   └── app.js             # 应用入口
-│   ├── database/              # SQLite 数据库
-│   ├── package.json
-│   └── .env                   # 环境变量
-│
-├── frontend/                  # 前端应用
-│   ├── src/
-│   │   ├── api/              # API 接口封装
-│   │   ├── components/       # 公共组件
-│   │   ├── views/            # 页面视图
-│   │   ├── router/           # 路由配置
-│   │   ├── stores/           # Pinia 状态管理
-│   │   ├── utils/            # 工具函数
-│   │   ├── App.vue
-│   │   └── main.js
-│   ├── package.json
-│   └── vite.config.js
-│
-└── README.md
-```
+- **dayjs** - 时间处理
 
 ## 快速开始
 
 ### 环境要求
-
 - Node.js >= 18.0.0
 - npm >= 9.0.0
 
 ### 安装步骤
 
-#### 1. 安装后端依赖
-
 ```bash
+# 安装后端依赖
 cd backend
 npm install
-```
 
-#### 2. 安装前端依赖
-
-```bash
-cd frontend
+# 安装前端依赖
+cd ../frontend
 npm install
 ```
 
 ### 运行项目
 
-#### 1. 启动后端服务
-
 ```bash
+# 启动后端服务（端口 3000）
 cd backend
 npm start
-```
 
-后端服务将运行在 `http://localhost:3000`
-
-#### 2. 启动前端开发服务器
-
-```bash
+# 启动前端开发服务器（端口 5173）
 cd frontend
 npm run dev
 ```
 
-前端应用将运行在 `http://localhost:5173`
+访问 http://localhost:5173 开始使用
 
-### 构建生产版本
+### 首次安装
 
-#### 构建前端
+1. 访问 http://localhost:5173 自动跳转到安装页面
+2. 创建管理员账户
+3. 登录后开始使用
 
-```bash
-cd frontend
-npm run build
-```
-
-构建产物将输出到 `frontend/dist` 目录。
-
-## 使用说明
+## 使用指南
 
 ### 创建监控项
+1. 点击左侧"新建监控"
+2. 填写监控信息（名称、类型、目标、检测间隔）
+3. 保存后自动开始监控
 
-1. 点击右上角 "新建监控" 按钮
-2. 填写监控项信息：
-   - **监控名称**：便于识别的名称
-   - **监控类型**：HTTP/HTTPS、TCP 或 PING
-   - **监控目标**：
-     - HTTP: 完整的 URL（如 `https://example.com/api`）
-     - TCP: 主机:端口（如 `localhost:3306`）
-     - PING: 域名或 IP 地址（如 `8.8.8.8`）
-   - **检测间隔**：监控检测的时间间隔（秒）
-   - **超时时间**：请求超时时间（秒）
-3. 点击 "创建监控项" 保存
+### 创建状态页
+1. 进入"状态页管理"
+2. 点击"新建状态页"
+3. 配置名称、Slug、选择要展示的监控项
+4. 通过 `/status/{slug}` 访问公开状态页
 
-### 查看监控详情
+### 系统设置
+1. 进入"系统管理"
+2. 配置网站基本信息
+3. 切换主题模式或强调色
 
-- 点击监控卡片可查看详细信息
-- 包含：
-  - 可用率统计（24h/7d/30d）
-  - 平均响应时间
-  - 响应时间趋势图
-  - 最近检测结果
-  - 故障事件历史
+## API 文档
 
-### 管理监控项
+### 认证
+- `POST /api/auth/login` - 用户登录
+- `POST /api/auth/register` - 用户注册（管理员）
+- `GET /api/auth/me` - 获取当前用户信息
 
-- **启用/禁用**：点击监控卡片菜单中的"启用"或"禁用"
-- **编辑**：点击"编辑"修改监控配置
-- **删除**：点击"删除"移除监控项
+### 监控管理
+- `GET /api/monitors` - 获取监控列表
+- `POST /api/monitors` - 创建监控
+- `GET /api/monitors/:id` - 获取监控详情
+- `PUT /api/monitors/:id` - 更新监控
+- `DELETE /api/monitors/:id` - 删除监控
 
-## API 接口
+### 状态页
+- `GET /api/status-pages` - 获取状态页列表
+- `POST /api/status-pages` - 创建状态页
+- `GET /api/status-pages/public/:slug` - 公开访问状态页
 
-### 监控项管理
+### 用户管理
+- `GET /api/users` - 获取用户列表
+- `POST /api/users` - 创建用户
+- `PUT /api/users/:id` - 更新用户
+- `DELETE /api/users/:id` - 删除用户
 
-- `GET /api/monitors` - 获取所有监控项
-- `POST /api/monitors` - 创建监控项
-- `GET /api/monitors/:id` - 获取单个监控项
-- `PUT /api/monitors/:id` - 更新监控项
-- `DELETE /api/monitors/:id` - 删除监控项
-- `POST /api/monitors/:id/toggle` - 切换启用状态
+## 项目结构
 
-### 数据查询
-
-- `GET /api/monitors/:id/results` - 获取检测历史
-- `GET /api/monitors/:id/stats` - 获取统计数据
-- `GET /api/monitors/:id/incidents` - 获取故障事件
-- `GET /api/dashboard` - 获取仪表盘总览
-
-### Socket.io 事件
-
-- `monitor:status` - 监控状态更新
-- `monitor:incident` - 故障事件通知
-
-## 配置说明
-
-### 后端环境变量 (.env)
-
-```env
-PORT=3000                          # 服务端口
-CORS_ORIGIN=http://localhost:5173 # 允许的前端地址
-DATA_RETENTION_DAYS=30             # 数据保留天数
-NODE_ENV=development               # 运行环境
 ```
-
-### 前端代理配置 (vite.config.js)
-
-```javascript
-server: {
-  port: 5173,
-  proxy: {
-    '/api': {
-      target: 'http://localhost:3000',
-      changeOrigin: true
-    }
-  }
-}
+Uptime/
+├── backend/
+│   ├── src/
+│   │   ├── controllers/    # 控制器
+│   │   ├── models/         # 数据模型
+│   │   ├── routes/         # 路由
+│   │   ├── middleware/     # 中间件
+│   │   ├── services/       # 业务服务
+│   │   └── app.js          # 入口文件
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── views/          # 页面视图
+│   │   ├── router/         # 路由配置
+│   │   ├── stores/         # 状态管理
+│   │   ├── api/            # API 封装
+│   │   ├── utils/          # 工具函数
+│   │   └── styles/         # 样式文件
+│   └── package.json
+└── README.md
 ```
-
-## 数据库设计
-
-系统使用 SQLite 数据库，包含以下表：
-
-- **monitors** - 监控项配置
-- **check_results** - 检测结果记录
-- **incidents** - 故障事件记录
-
-## 开发指南
-
-### 后端开发
-
-```bash
-cd backend
-npm run dev  # 使用 --watch 模式运行
-```
-
-### 前端开发
-
-```bash
-cd frontend
-npm run dev
-```
-
-前端支持热更新，修改代码后自动刷新。
 
 ## 许可证
 
-MIT License
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 作者
-
-Your Name
+Apache-2.0 license
