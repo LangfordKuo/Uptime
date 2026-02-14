@@ -1,59 +1,68 @@
 <template>
-  <div class="public-status-page" v-loading="loading">
-    <div v-if="statusPage" class="status-container">
+  <div class="public-status-page">
+    <div class="status-container">
       <!-- 头部 -->
       <header class="status-header">
-        <div v-if="statusPage.logo_url" class="logo">
+        <div v-if="statusPage?.logo_url" class="logo">
           <img :src="statusPage.logo_url" :alt="statusPage.name" />
         </div>
-        <h1>{{ statusPage.name }}</h1>
-        <p v-if="statusPage.description" class="description">{{ statusPage.description }}</p>
-        <div class="last-updated">
-          最后更新: {{ formatDateTime(statusPage.updated_at || statusPage.created_at) }}
-        </div>
+        <h1>{{ statusPage?.name }}</h1>
+        <p v-if="statusPage?.description" class="description">{{ statusPage.description }}</p>
       </header>
 
-      <!-- 整体状态概览 -->
-      <div class="overall-status" :class="overallStatusClass">
-        <el-icon :size="48">
-          <CircleCheck v-if="overallStatus === 'operational'" />
-          <Warning v-else-if="overallStatus === 'degraded'" />
-          <CircleClose v-else />
-        </el-icon>
-        <h2>{{ overallStatusText }}</h2>
+      <!-- 整体状态 - 横向紧凑布局 -->
+      <div class="overall-status" :class="overallStatus">
+        <div class="status-left">
+          <div class="status-icon">
+            <el-icon :size="32">
+              <CircleCheck v-if="overallStatus === 'operational'" />
+              <Warning v-else-if="overallStatus === 'degraded'" />
+              <CircleClose v-else />
+            </el-icon>
+          </div>
+          <h2>{{ overallStatusText }}</h2>
+        </div>
+        <div class="status-right">
+          <p class="last-updated">最后更新: {{ formatTime(statusPage?.updated_at) }}</p>
+        </div>
       </div>
 
-      <!-- 监控项列表 -->
-      <div class="monitors-section">
+      <!-- 服务列表 -->
+      <div class="services-section">
         <h3>服务状态</h3>
-        <div class="monitors-list">
+        <div class="services-list">
           <div
-            v-for="monitor in statusPage.monitors"
+            v-for="monitor in statusPage?.monitors"
             :key="monitor.id"
-            class="monitor-item"
-            :class="getMonitorStatusClass(monitor)"
+            class="service-item"
           >
-            <div class="monitor-info">
-              <div class="monitor-name">
-                <el-icon :size="20">
-                  <CircleCheck v-if="monitor.latest_status === 'up'" />
-                  <CircleClose v-else-if="monitor.latest_status === 'down'" />
-                  <QuestionFilled v-else />
-                </el-icon>
-                <span>{{ monitor.display_name || monitor.name }}</span>
+            <div class="service-header">
+              <div class="service-info">
+                <div class="service-name">
+                  <div class="status-dot" :class="monitor.latest_status || 'unknown'"></div>
+                  <span>{{ monitor.display_name || monitor.name }}</span>
+                </div>
+                <span class="service-type">{{ getTypeText(monitor.type) }}</span>
               </div>
-              <div class="monitor-type">{{ getTypeText(monitor.type) }}</div>
+              <div class="service-status">
+                <span class="status-text" :class="monitor.latest_status || 'unknown'">
+                  {{ getStatusText(monitor.latest_status) }}
+                </span>
+                <span v-if="monitor.latest_response_time" class="response-time">
+                  {{ monitor.latest_response_time }}ms
+                </span>
+              </div>
             </div>
-            <div class="monitor-status">
-              <el-tag :type="getStatusType(monitor.latest_status)" size="large">
-                {{ getStatusText(monitor.latest_status) }}
-              </el-tag>
-              <div v-if="monitor.latest_response_time" class="response-time">
-                {{ monitor.latest_response_time }}ms
-              </div>
-              <div v-if="monitor.latest_check" class="last-check">
-                {{ formatTimeFromNow(monitor.latest_check) }}
-              </div>
+
+            <!-- 30天热力图 -->
+            <div class="heatmap">
+              <div
+                v-for="(day, index) in monitor.daily_uptime"
+                :key="index"
+                class="heat-cell"
+                :class="getHeatColor(day.uptime)"
+                :title="getTooltip(day)"
+              ></div>
             </div>
           </div>
         </div>
@@ -61,11 +70,9 @@
 
       <!-- 页脚 -->
       <footer class="status-footer">
-        <p>由 Uptime Monitor 提供技术支持</p>
+        <p>Powered by Uptime Monitor</p>
       </footer>
     </div>
-
-    <el-empty v-else-if="!loading" description="状态页不存在或未公开" />
   </div>
 </template>
 
@@ -74,264 +81,249 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { statusPageApi } from '@/api'
-import { formatTime, formatTimeFromNow } from '@/utils/datetime'
+import { formatTime } from '@/utils/datetime'
 
 const route = useRoute()
-
 const statusPage = ref(null)
-const loading = ref(false)
 
 const overallStatus = computed(() => {
-  if (!statusPage.value?.monitors || statusPage.value.monitors.length === 0) {
-    return 'unknown'
-  }
-
+  if (!statusPage.value?.monitors?.length) return 'unknown'
   const monitors = statusPage.value.monitors
-  const downCount = monitors.filter(m => m.latest_status === 'down').length
-  const unknownCount = monitors.filter(m => !m.latest_status || m.latest_status === 'unknown').length
-  const upCount = monitors.filter(m => m.latest_status === 'up').length
-
-  if (downCount > 0) return 'down'
-  if (unknownCount > 0) return 'degraded'
-  if (upCount > 0) return 'operational'
-  return 'unknown'
+  const down = monitors.filter(m => m.latest_status === 'down').length
+  const unknown = monitors.filter(m => !m.latest_status || m.latest_status === 'unknown').length
+  
+  if (down > 0) return 'down'
+  if (unknown > 0) return 'degraded'
+  return 'operational'
 })
 
-const overallStatusClass = computed(() => {
-  const map = {
-    operational: 'status-operational',
-    degraded: 'status-degraded',
-    down: 'status-down',
-    unknown: 'status-unknown'
-  }
-  return map[overallStatus.value]
-})
+const overallStatusText = computed(() => ({
+  operational: '所有系统运行正常',
+  degraded: '部分服务异常',
+  down: '服务中断',
+  unknown: '状态未知'
+}[overallStatus.value]))
 
-const overallStatusText = computed(() => {
-  const map = {
-    operational: '所有系统运行正常',
-    degraded: '部分服务异常',
-    down: '服务中断',
-    unknown: '状态未知'
-  }
-  return map[overallStatus.value]
-})
+const getTypeText = (type) => ({ http: 'HTTP', tcp: 'TCP', ping: 'PING' }[type] || type)
+const getStatusText = (status) => ({ up: '正常', down: '故障', unknown: '未知' }[status] || '未知')
 
-const formatDateTime = (time) => {
-  return formatTime(time)
+const getHeatColor = (uptime) => {
+  if (uptime === null || uptime === undefined) return 'no-data'
+  if (uptime >= 90) return 'excellent'
+  if (uptime >= 70) return 'warning'
+  return 'critical'
 }
 
-const getMonitorStatusClass = (monitor) => {
-  const status = monitor.latest_status || 'unknown'
-  return `monitor-${status}`
-}
-
-const getStatusType = (status) => {
-  const map = {
-    up: 'success',
-    down: 'danger',
-    unknown: 'info'
-  }
-  return map[status] || 'info'
-}
-
-const getStatusText = (status) => {
-  const map = {
-    up: '正常',
-    down: '故障',
-    unknown: '未知'
-  }
-  return map[status] || '未知'
-}
-
-const getTypeText = (type) => {
-  const map = {
-    http: 'HTTP/HTTPS',
-    tcp: 'TCP端口',
-    ping: 'PING'
-  }
-  return map[type] || type
+const getTooltip = (day) => {
+  if (day.uptime === null) return `${day.date}: 无数据`
+  return `${day.date}: ${day.uptime.toFixed(1)}% (${day.up_count}/${day.total_checks})`
 }
 
 const loadStatusPage = async () => {
-  const slug = route.params.slug
-  if (!slug) return
-
   try {
-    loading.value = true
-    const res = await statusPageApi.getPublic(slug)
+    const res = await statusPageApi.getPublic(route.params.slug)
     statusPage.value = res.data
-  } catch (error) {
-    ElMessage.error('加载状态页失败')
-  } finally {
-    loading.value = false
+    
+    // 设置页面标题
+    if (statusPage.value?.name) {
+      document.title = `${statusPage.value.name} - 状态页`
+    }
+  } catch {
+    ElMessage.error('加载失败')
   }
 }
 
-onMounted(() => {
-  loadStatusPage()
-})
+onMounted(loadStatusPage)
 </script>
 
 <style scoped>
 .public-status-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 40px 20px;
+  background: #F5F5F5;
+  padding: 48px 24px;
 }
 
 .status-container {
-  max-width: 900px;
+  max-width: 800px;
   margin: 0 auto;
 }
 
+/* 头部 */
 .status-header {
   text-align: center;
-  color: white;
-  margin-bottom: 40px;
+  color: var(--md-on-surface);
+  margin-bottom: 32px;
 }
 
-.status-header .logo {
-  margin-bottom: 20px;
-}
-
-.status-header .logo img {
-  max-height: 80px;
-  max-width: 200px;
+.logo img {
+  max-height: 64px;
+  margin-bottom: 16px;
 }
 
 .status-header h1 {
-  font-size: 36px;
-  margin: 0 0 16px 0;
-}
-
-.status-header .description {
-  font-size: 18px;
-  opacity: 0.9;
+  font-size: 2.5rem;
+  font-weight: 700;
   margin: 0 0 8px 0;
 }
 
-.status-header .last-updated {
-  font-size: 14px;
-  opacity: 0.7;
+.description {
+  font-size: 1.125rem;
+  opacity: 0.9;
+  margin: 0;
 }
 
+/* 整体状态 - 横向紧凑布局 */
 .overall-status {
-  background: white;
-  border-radius: 12px;
-  padding: 40px;
-  text-align: center;
-  margin-bottom: 30px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-.overall-status.status-operational {
-  color: #67c23a;
-}
-
-.overall-status.status-degraded {
-  color: #e6a23c;
-}
-
-.overall-status.status-down {
-  color: #f56c6c;
-}
-
-.overall-status.status-unknown {
-  color: #909399;
-}
-
-.overall-status h2 {
-  margin: 16px 0 0 0;
-  font-size: 24px;
-}
-
-.monitors-section {
-  background: white;
-  border-radius: 12px;
-  padding: 30px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-.monitors-section h3 {
-  margin: 0 0 20px 0;
-  font-size: 20px;
-  color: #303133;
-}
-
-.monitors-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.monitor-item {
+  background: var(--md-surface);
+  border-radius: var(--md-shape-lg);
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: var(--md-elevation-1);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
-  border-radius: 8px;
-  background: #f5f7fa;
-  border-left: 4px solid #909399;
-  transition: all 0.3s;
 }
 
-.monitor-item.monitor-up {
-  border-left-color: #67c23a;
-  background: #f0f9eb;
-}
+.overall-status.operational .status-left { color: var(--md-success); }
+.overall-status.degraded .status-left { color: var(--md-warning); }
+.overall-status.down .status-left { color: var(--md-error); }
 
-.monitor-item.monitor-down {
-  border-left-color: #f56c6c;
-  background: #fef0f0;
-}
-
-.monitor-item.monitor-unknown {
-  border-left-color: #909399;
-  background: #f4f4f5;
-}
-
-.monitor-info {
-  flex: 1;
-}
-
-.monitor-name {
+.status-left {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 18px;
-  font-weight: 500;
-  color: #303133;
-  margin-bottom: 4px;
 }
 
-.monitor-type {
-  font-size: 14px;
-  color: #909399;
-  margin-left: 32px;
+.status-icon {
+  display: flex;
+  align-items: center;
 }
 
-.monitor-status {
+.overall-status h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--md-on-surface);
+}
+
+.status-right {
   text-align: right;
 }
 
-.response-time {
-  font-size: 14px;
-  color: #606266;
-  margin-top: 8px;
+.last-updated {
+  font-size: 0.75rem;
+  color: var(--md-on-surface-variant);
+  margin: 0;
 }
 
-.last-check {
-  font-size: 12px;
-  color: #909399;
+/* 服务列表 */
+.services-section {
+  background: var(--md-surface);
+  border-radius: var(--md-shape-lg);
+  padding: 20px;
+  box-shadow: var(--md-elevation-1);
+}
+
+.services-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+  color: var(--md-on-surface);
+}
+
+.services-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.service-item {
+  padding: 16px;
+  background: var(--md-surface-variant);
+  border-radius: var(--md-shape-md);
+}
+
+.service-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.service-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--md-on-surface);
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--md-outline);
+}
+
+.status-dot.up { background: var(--md-success); box-shadow: 0 0 8px var(--md-success); }
+.status-dot.down { background: var(--md-error); box-shadow: 0 0 8px var(--md-error); }
+
+.service-type {
+  font-size: 0.75rem;
+  color: var(--md-on-surface-variant);
+  margin-left: 24px;
+  text-transform: uppercase;
+}
+
+.service-status {
+  text-align: right;
+}
+
+.status-text {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.status-text.up { color: var(--md-success); }
+.status-text.down { color: var(--md-error); }
+
+.response-time {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--md-on-surface-variant);
   margin-top: 4px;
 }
 
+/* 热力图 */
+.heatmap {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.heat-cell {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: transform 0.2s;
+  background: var(--md-outline-variant);
+}
+
+.heat-cell:hover {
+  transform: scale(1.3);
+}
+
+.heat-cell.excellent { background: var(--md-success); }
+.heat-cell.warning { background: var(--md-warning); }
+.heat-cell.critical { background: var(--md-error); }
+
+/* 页脚 */
 .status-footer {
   text-align: center;
-  color: white;
-  opacity: 0.7;
-  margin-top: 40px;
-  font-size: 14px;
+  color: var(--md-on-surface-variant);
+  margin-top: 32px;
+  font-size: 0.875rem;
 }
 </style>

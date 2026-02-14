@@ -1,85 +1,150 @@
 <template>
-  <div class="layout">
-    <el-container>
-      <el-header class="header">
-        <div class="header-content">
-          <h1 class="title">
-            <el-icon><Monitor /></el-icon>
-            Uptime Monitor
-          </h1>
-          <div class="header-right">
-            <el-button 
-              type="primary" 
-              @click="$router.push('/monitors/create')"
-              v-if="authStore.isAdmin || authStore.isUser"
-            >
-              <el-icon><Plus /></el-icon>
-              新建监控
-            </el-button>
-            <el-dropdown @command="handleCommand">
-              <el-button type="info" plain>
-                <el-icon><User /></el-icon>
-                {{ authStore.user?.username }}
-                <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item disabled>
-                    <el-tag :type="roleType" size="small">{{ roleText }}</el-tag>
-                  </el-dropdown-item>
-                  <el-dropdown-item command="statusPages" v-if="authStore.isAdmin">
-                    <el-icon><Document /></el-icon>
-                    状态页管理
-                  </el-dropdown-item>
-                  <el-dropdown-item command="users" v-if="authStore.isAdmin">
-                    <el-icon><UserFilled /></el-icon>
-                    用户管理
-                  </el-dropdown-item>
-                  <el-dropdown-item divided command="logout">
-                    <el-icon><SwitchButton /></el-icon>
-                    退出登录
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </div>
+  <div class="app-layout">
+    <!-- 侧边导航栏 -->
+    <aside class="sidebar" :class="{ 'collapsed': isCollapsed }">
+      <div class="sidebar-header">
+        <div class="logo">
+          <el-icon :size="32" color="var(--md-primary)"><Monitor /></el-icon>
+          <span v-if="!isCollapsed" class="logo-text">Uptime</span>
         </div>
-      </el-header>
-      <el-main class="main">
+        <el-button 
+          text 
+          class="collapse-btn"
+          @click="isCollapsed = !isCollapsed"
+        >
+          <el-icon :size="20"><Fold v-if="!isCollapsed" /><Expand v-else /></el-icon>
+        </el-button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <router-link 
+          v-for="item in menuItems" 
+          :key="item.path"
+          :to="item.path"
+          class="nav-item"
+          :class="{ 'active': $route.path === item.path }"
+        >
+          <el-icon :size="24"><component :is="item.icon" /></el-icon>
+          <span v-if="!isCollapsed" class="nav-text">{{ item.title }}</span>
+        </router-link>
+      </nav>
+
+      <div class="sidebar-footer">
+        <el-dropdown trigger="click" @command="handleCommand">
+          <div class="user-profile">
+            <div class="avatar">
+              {{ authStore.user?.username?.charAt(0).toUpperCase() }}
+            </div>
+            <div v-if="!isCollapsed" class="user-info">
+              <div class="username">{{ authStore.user?.username }}</div>
+              <div class="role">{{ roleText }}</div>
+            </div>
+            <el-icon v-if="!isCollapsed" class="arrow"><ArrowDown /></el-icon>
+          </div>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="users" v-if="authStore.isAdmin">
+                <el-icon><UserFilled /></el-icon>
+                <span>用户管理</span>
+              </el-dropdown-item>
+              <el-dropdown-item divided command="logout">
+                <el-icon><SwitchButton /></el-icon>
+                <span>退出登录</span>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+      <!-- 顶部栏 -->
+      <header class="top-bar">
+        <div class="page-title">
+          <h1>{{ pageTitle }}</h1>
+          <p class="subtitle">{{ pageSubtitle }}</p>
+        </div>
+        <div class="top-actions">
+          <el-button 
+            v-if="showCreateButton"
+            type="primary" 
+            size="large"
+            class="fab-button"
+            @click="handleCreate"
+          >
+            <el-icon><Plus /></el-icon>
+            <span>新建监控</span>
+          </el-button>
+        </div>
+      </header>
+
+      <!-- 页面内容 -->
+      <div class="content-area">
         <router-view />
-      </el-main>
-    </el-container>
+      </div>
+    </main>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useMonitorStore } from '@/stores/monitor'
 import { useAuthStore } from '@/stores/auth'
 
+const route = useRoute()
 const router = useRouter()
 const monitorStore = useMonitorStore()
 const authStore = useAuthStore()
 
-const roleType = computed(() => {
-  switch (authStore.user?.role) {
-    case 'admin': return 'danger'
-    case 'user': return 'success'
-    case 'viewer': return 'info'
-    default: return 'info'
+const isCollapsed = ref(false)
+
+const menuItems = computed(() => {
+  const items = [
+    { path: '/', title: '仪表盘', icon: 'Odometer' },
+  ]
+  if (authStore.isAdmin) {
+    items.push({ path: '/status-pages', title: '状态页管理', icon: 'Document' })
+    items.push({ path: '/system-settings', title: '系统管理', icon: 'Setting' })
   }
+  items.push({ path: '/monitors/create', title: '新建监控', icon: 'Plus' })
+  return items
 })
 
 const roleText = computed(() => {
-  switch (authStore.user?.role) {
-    case 'admin': return '管理员'
-    case 'user': return '用户'
-    case 'viewer': return '访客'
-    default: return '未知'
-  }
+  const map = { admin: '管理员', user: '用户', viewer: '访客' }
+  return map[authStore.user?.role] || ''
 })
+
+const pageTitle = computed(() => {
+  const titles = {
+    '/': '仪表盘',
+    '/monitors/create': '新建监控',
+    '/status-pages': '状态页管理',
+    '/system-settings': '系统管理',
+  }
+  return titles[route.path] || '监控详情'
+})
+
+const pageSubtitle = computed(() => {
+  const subtitles = {
+    '/': '查看所有服务的运行状态',
+    '/monitors/create': '添加新的服务监控',
+    '/status-pages': '管理公开状态页面',
+    '/system-settings': '配置网站基本信息和外观',
+  }
+  return subtitles[route.path] || ''
+})
+
+const showCreateButton = computed(() => {
+  return route.path === '/' && (authStore.isAdmin || authStore.isUser)
+})
+
+const handleCreate = () => {
+  router.push('/monitors/create')
+}
 
 const handleCommand = async (command) => {
   if (command === 'logout') {
@@ -89,12 +154,10 @@ const handleCommand = async (command) => {
         cancelButtonText: '取消',
         type: 'warning'
       })
-      
       authStore.logout()
-      ElMessage.success('已退出登录')
       router.push('/login')
-    } catch (error) {
-      // 用户取消
+    } catch {
+      // 取消
     }
   } else if (command === 'users') {
     router.push('/users')
@@ -113,41 +176,229 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.layout {
-  min-height: 100vh;
-}
-
-.header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.header-content {
+.app-layout {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 100%;
+  min-height: 100vh;
+  background-color: var(--md-background);
 }
 
-.header-right {
+/* 侧边栏 */
+.sidebar {
+  width: 280px;
+  background-color: var(--md-surface);
+  border-right: 1px solid var(--md-outline-variant);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+  position: fixed;
+  height: 100vh;
+  z-index: 100;
+}
+
+.sidebar.collapsed {
+  width: 80px;
+}
+
+.sidebar-header {
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.logo {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.title {
-  color: white;
-  font-size: 24px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
+.logo-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--md-primary);
+  letter-spacing: -0.5px;
 }
 
-.main {
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
-  width: 100%;
+.collapse-btn {
+  padding: 8px;
+  color: var(--md-on-surface-variant);
+}
+
+/* 导航 */
+.sidebar-nav {
+  flex: 1;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: var(--md-shape-full);
+  color: var(--md-on-surface-variant);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.nav-item:hover {
+  background-color: var(--md-surface-variant);
+  color: var(--md-on-surface);
+}
+
+.nav-item.active {
+  background-color: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 60%;
+  background-color: var(--md-primary);
+  border-radius: 0 4px 4px 0;
+}
+
+.nav-text {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+/* 用户资料 */
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--md-shape-md);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.user-profile:hover {
+  background-color: var(--md-surface-variant);
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--md-shape-full);
+  background: linear-gradient(135deg, var(--md-primary), var(--md-tertiary));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.username {
+  font-weight: 600;
+  color: var(--md-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.role {
+  font-size: 0.75rem;
+  color: var(--md-on-surface-variant);
+}
+
+.arrow {
+  color: var(--md-on-surface-variant);
+}
+
+/* 主内容区 */
+.main-content {
+  flex: 1;
+  margin-left: 280px;
+  transition: margin-left 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar.collapsed + .main-content {
+  margin-left: 80px;
+}
+
+/* 顶部栏 */
+.top-bar {
+  padding: 24px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--md-background);
+}
+
+.page-title h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--md-on-background);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.page-title .subtitle {
+  font-size: 1rem;
+  color: var(--md-on-surface-variant);
+  margin: 4px 0 0 0;
+}
+
+.fab-button {
+  height: 56px;
+  padding: 0 24px;
+  font-size: 1rem;
+  border-radius: var(--md-shape-full) !important;
+  box-shadow: var(--md-elevation-2);
+}
+
+.fab-button:hover {
+  box-shadow: var(--md-elevation-3);
+}
+
+/* 内容区 */
+.content-area {
+  flex: 1;
+  padding: 0 32px 32px;
+  overflow-y: auto;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 80px;
+  }
+  
+  .sidebar .logo-text,
+  .sidebar .nav-text,
+  .sidebar .user-info,
+  .sidebar .arrow {
+    display: none;
+  }
+  
+  .main-content {
+    margin-left: 80px;
+  }
 }
 </style>

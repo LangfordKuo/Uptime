@@ -114,6 +114,12 @@ const routes = [
         name: 'StatusPageManagement',
         component: () => import('@/views/StatusPageManagement.vue'),
         meta: { requiresRole: ['admin'] }
+      },
+      {
+        path: 'system-settings',
+        name: 'SystemSettings',
+        component: () => import('@/views/SystemSettings.vue'),
+        meta: { requiresRole: ['admin'] }
       }
     ]
   }

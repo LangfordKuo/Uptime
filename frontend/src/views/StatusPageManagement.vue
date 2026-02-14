@@ -293,18 +293,124 @@ onMounted(() => {
 
 <style scoped>
 .status-page-management {
-  padding: 20px;
+  padding: 0;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 8px 4px;
+}
+
+.card-header span {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--md-on-surface);
 }
 
 .status-page-name {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* 表格样式优化 */
+:deep(.el-table) {
+  border-radius: var(--md-shape-lg);
+  overflow: hidden;
+  background-color: var(--md-surface);
+}
+
+:deep(.el-table th) {
+  background-color: var(--md-surface-variant) !important;
+  color: var(--md-on-surface-variant) !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  padding: 16px 12px !important;
+}
+
+:deep(.el-table td) {
+  color: var(--md-on-surface) !important;
+  padding: 16px 12px !important;
+}
+
+:deep(.el-table__row:hover > td) {
+  background-color: var(--md-surface-variant) !important;
+}
+
+/* 标签样式 */
+:deep(.el-tag--success) {
+  background-color: #E8F5E9 !important;
+  color: #2E7D32 !important;
+  border-color: transparent !important;
+}
+
+:deep(.el-tag--info) {
+  background-color: #F5F5F5 !important;
+  color: #6B6B6B !important;
+  border-color: transparent !important;
+}
+
+/* 按钮样式 */
+:deep(.el-button--primary) {
+  background-color: var(--md-primary) !important;
+  border-color: var(--md-primary) !important;
+}
+
+:deep(.el-button--primary:hover) {
+  background-color: #333333 !important;
+  border-color: #333333 !important;
+}
+
+:deep(.el-button--danger) {
+  background-color: var(--md-error) !important;
+  border-color: var(--md-error) !important;
+}
+
+/* 链接样式 */
+:deep(.el-link--primary) {
+  color: var(--md-primary) !important;
+}
+
+:deep(.el-link--primary:hover) {
+  color: #333333 !important;
+}
+
+/* 对话框样式 */
+:deep(.el-dialog) {
+  border-radius: var(--md-shape-xl) !important;
+}
+
+:deep(.el-dialog__header) {
+  padding: 24px 24px 16px !important;
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+:deep(.el-dialog__body) {
+  padding: 16px 24px !important;
+}
+
+:deep(.el-dialog__footer) {
+  padding: 16px 24px 24px !important;
+}
+
+/* 表单样式 */
+:deep(.el-form-item__label) {
+  color: var(--md-on-surface-variant) !important;
+  font-weight: 500;
+}
+
+:deep(.el-input__wrapper) {
+  background-color: var(--md-surface-variant) !important;
+  border-color: var(--md-outline-variant) !important;
+}
+
+:deep(.el-textarea__inner) {
+  background-color: var(--md-surface-variant) !important;
+  border-color: var(--md-outline-variant) !important;
 }
 </style>

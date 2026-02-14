@@ -147,7 +147,58 @@ class StatusPageModel {
       WHERE spm.status_page_id = ?
       ORDER BY spm.display_order ASC
     `);
-    return stmt.all(statusPageId);
+    const monitors = stmt.all(statusPageId);
+    
+    // 为每个监控项获取30天的在线率数据
+    return monitors.map(monitor => {
+      const dailyUptime = this.getMonitorDailyUptime(monitor.id, 30);
+      return {
+        ...monitor,
+        daily_uptime: dailyUptime
+      };
+    });
+  }
+
+  // 获取监控项最近N天的每日在线率
+  static getMonitorDailyUptime(monitorId, days = 30) {
+    const result = [];
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      // 获取该日期的检测记录
+      const stmt = db.prepare(`
+        SELECT 
+          COUNT(*) as total_checks,
+          SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) as up_count
+        FROM check_results
+        WHERE monitor_id = ?
+          AND date(checked_at) = ?
+      `);
+      
+      const data = stmt.get(monitorId, dateStr);
+      
+      if (data.total_checks > 0) {
+        const uptime = (data.up_count / data.total_checks) * 100;
+        result.push({
+          date: dateStr,
+          uptime: Math.round(uptime * 100) / 100,
+          total_checks: data.total_checks,
+          up_count: data.up_count
+        });
+      } else {
+        result.push({
+          date: dateStr,
+          uptime: null,
+          total_checks: 0,
+          up_count: 0
+        });
+      }
+    }
+    
+    return result;
   }
 
   // 检查 slug 是否已存在

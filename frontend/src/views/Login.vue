@@ -1,68 +1,59 @@
 <template>
   <div class="login-page">
     <div class="login-container">
-      <el-card class="login-card">
-        <template #header>
-          <div class="login-header">
-            <el-icon class="header-icon"><Monitor /></el-icon>
-            <h2>Uptime Monitor</h2>
-            <p class="subtitle">服务监控系统</p>
-          </div>
-        </template>
+      <div class="brand-section">
+        <div class="logo">
+          <el-icon :size="64" color="var(--md-primary)"><Monitor /></el-icon>
+        </div>
+        <h1>Uptime Monitor</h1>
+        <p>服务状态监控系统</p>
+      </div>
 
-        <el-form
-          ref="formRef"
-          :model="form"
-          :rules="rules"
-          label-width="0"
-          size="large"
-        >
-          <el-form-item prop="username">
-            <el-input
-              v-model="form.username"
-              placeholder="用户名"
-              prefix-icon="User"
-              @keyup.enter="handleLogin"
-            />
-          </el-form-item>
+      <div class="form-section">
+        <div class="form-card">
+          <h2>欢迎回来</h2>
+          <p class="subtitle">请登录您的账户</p>
 
-          <el-form-item prop="password">
-            <el-input
-              v-model="form.password"
-              type="password"
-              placeholder="密码"
-              prefix-icon="Lock"
-              show-password
-              @keyup.enter="handleLogin"
-            />
-          </el-form-item>
+          <el-form
+            ref="formRef"
+            :model="form"
+            :rules="rules"
+            class="login-form"
+          >
+            <el-form-item prop="username">
+              <el-input
+                v-model="form.username"
+                placeholder="用户名"
+                size="large"
+                :prefix-icon="User"
+                @keyup.enter="handleLogin"
+              />
+            </el-form-item>
 
-          <el-form-item>
+            <el-form-item prop="password">
+              <el-input
+                v-model="form.password"
+                type="password"
+                placeholder="密码"
+                size="large"
+                :prefix-icon="Lock"
+                show-password
+                @keyup.enter="handleLogin"
+              />
+            </el-form-item>
+
             <el-button
               type="primary"
+              size="large"
+              class="login-btn"
               :loading="loading"
               @click="handleLogin"
-              style="width: 100%"
             >
               登录
             </el-button>
-          </el-form-item>
-        </el-form>
-
-        <div class="login-tip">
-          <el-alert
-            title="默认管理员账户"
-            type="info"
-            :closable="false"
-            show-icon
-          >
-            <template #default>
-              用户名: <strong>admin</strong><br/>
-              密码: <strong>admin123</strong>
-            </template>
-          </el-alert>
+          </el-form>
         </div>
-      </el-card>
+      </div>
     </div>
   </div>
 </template>
@@ -71,6 +62,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { User, Lock } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -96,16 +88,16 @@ const rules = {
 const handleLogin = async () => {
   try {
     await formRef.value.validate()
-    
     loading.value = true
     
     await authStore.login(form)
-    
     ElMessage.success('登录成功')
     router.push('/')
   } catch (error) {
-    if (error !== false) {
-      ElMessage.error(error.response?.data?.message || error.message || '登录失败')
+    if (error.response?.data?.message) {
+      ElMessage.error(error.response.data.message)
+    } else if (error !== false) {
+      ElMessage.error('登录失败')
     }
   } finally {
     loading.value = false
@@ -119,42 +111,111 @@ const handleLogin = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.login-container {
-  width: 400px;
+  background: linear-gradient(135deg, #6750A4 0%, #7D5260 100%);
   padding: 20px;
 }
 
-.login-card {
-  border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+.login-container {
+  display: flex;
+  width: 100%;
+  max-width: 960px;
+  min-height: 600px;
+  background: var(--md-surface);
+  border-radius: var(--md-shape-xl);
+  overflow: hidden;
+  box-shadow: var(--md-elevation-4);
 }
 
-.login-header {
+.brand-section {
+  flex: 1;
+  background: linear-gradient(135deg, var(--md-primary) 0%, var(--md-tertiary) 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  color: white;
   text-align: center;
 }
 
-.header-icon {
-  font-size: 64px;
-  color: #667eea;
-  margin-bottom: 16px;
+.logo {
+  width: 120px;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: var(--md-shape-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 32px;
+  backdrop-filter: blur(10px);
 }
 
-.login-header h2 {
-  margin: 0 0 8px 0;
-  color: #303133;
-  font-size: 28px;
+.brand-section h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 0 16px 0;
 }
 
-.subtitle {
+.brand-section p {
+  font-size: 1.125rem;
+  opacity: 0.9;
   margin: 0;
-  color: #909399;
-  font-size: 14px;
 }
 
-.login-tip {
-  margin-top: 20px;
+.form-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+}
+
+.form-card {
+  width: 100%;
+  max-width: 360px;
+}
+
+.form-card h2 {
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--md-on-surface);
+  margin: 0 0 8px 0;
+}
+
+.form-card .subtitle {
+  font-size: 1rem;
+  color: var(--md-on-surface-variant);
+  margin: 0 0 32px 0;
+}
+
+.login-form :deep(.el-input__wrapper) {
+  padding: 12px 16px;
+}
+
+.login-btn {
+  width: 100%;
+  height: 52px;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 16px;
+}
+
+@media (max-width: 768px) {
+  .login-container {
+    flex-direction: column;
+  }
+  
+  .brand-section {
+    padding: 32px;
+    min-height: 200px;
+  }
+  
+  .brand-section h1 {
+    font-size: 1.75rem;
+  }
+  
+  .form-section {
+    padding: 32px;
+  }
 }
 </style>

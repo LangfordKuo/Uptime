@@ -1,64 +1,49 @@
 <template>
-  <el-card class="monitor-card" :class="{ 'disabled': !monitor.enabled }">
-    <div class="card-content">
-      <div class="card-header">
-        <div class="header-left">
-          <el-tag :type="statusType" size="large">
-            {{ statusText }}
-          </el-tag>
-          <span class="monitor-name">{{ monitor.name }}</span>
-        </div>
-        <el-dropdown @command="handleCommand">
-          <el-icon class="more-icon"><More /></el-icon>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="view">
-                <el-icon><View /></el-icon>查看详情
-              </el-dropdown-item>
-              <el-dropdown-item command="edit">
-                <el-icon><Edit /></el-icon>编辑
-              </el-dropdown-item>
-              <el-dropdown-item command="toggle">
-                <el-icon><Switch /></el-icon>
-                {{ monitor.enabled ? '禁用' : '启用' }}
-              </el-dropdown-item>
-              <el-dropdown-item command="delete" divided>
-                <el-icon><Delete /></el-icon>删除
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+  <div class="monitor-card" :class="statusClass" @click="$emit('click')">
+    <div class="card-header">
+      <div class="status-indicator" :class="statusClass"></div>
+      <div class="monitor-type-badge">
+        {{ typeText }}
       </div>
+    </div>
 
-      <div class="card-body">
-        <div class="info-row">
-          <span class="label">类型:</span>
-          <el-tag size="small">{{ typeText }}</el-tag>
+    <div class="card-body">
+      <h3 class="monitor-name">{{ monitor.name }}</h3>
+      <p class="monitor-target">{{ monitor.target }}</p>
+
+      <div class="status-info">
+        <div class="status-badge" :class="statusClass">
+          <el-icon :size="16">
+            <CircleCheck v-if="monitor.latestStatus === 'up'" />
+            <CircleClose v-else-if="monitor.latestStatus === 'down'" />
+            <Minus v-else />
+          </el-icon>
+          <span>{{ statusText }}</span>
         </div>
-        <div class="info-row">
-          <span class="label">目标:</span>
-          <span class="value">{{ monitor.target }}</span>
-        </div>
-        <div class="info-row" v-if="monitor.latestResponseTime">
-          <span class="label">响应时间:</span>
-          <span class="value">{{ monitor.latestResponseTime }}ms</span>
-        </div>
-        <div class="info-row" v-if="monitor.uptime24h">
-          <span class="label">24h可用率:</span>
-          <span class="value">{{ monitor.uptime24h }}%</span>
-        </div>
-        <div class="info-row" v-if="monitor.latestCheck">
-          <span class="label">最后检测:</span>
-          <span class="value">{{ formatTime(monitor.latestCheck) }}</span>
+
+        <div class="metrics" v-if="monitor.latestResponseTime">
+          <div class="metric">
+            <el-icon><Timer /></el-icon>
+            <span>{{ monitor.latestResponseTime }}ms</span>
+          </div>
         </div>
       </div>
     </div>
-  </el-card>
+
+    <div class="card-footer">
+      <div class="uptime-badge">
+        <el-icon><TrendCharts /></el-icon>
+        <span>{{ monitor.uptime24h || 0 }}% 可用率</span>
+      </div>
+      <div class="last-check" v-if="monitor.latestCheck">
+        {{ formatTimeFromNow(monitor.latestCheck) }}
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { formatTimeFromNow } from '@/utils/datetime'
 
 const props = defineProps({
@@ -68,132 +53,189 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['toggle', 'delete'])
-const router = useRouter()
+defineEmits(['click'])
 
-const statusType = computed(() => {
-  if (!props.monitor.enabled) return 'info'
-  switch (props.monitor.latestStatus) {
-    case 'up': return 'success'
-    case 'down': return 'danger'
-    default: return 'info'
-  }
+const statusClass = computed(() => {
+  if (!props.monitor.enabled) return 'disabled'
+  return props.monitor.latestStatus || 'unknown'
 })
 
 const statusText = computed(() => {
-  if (!props.monitor.enabled) return '已禁用'
-  switch (props.monitor.latestStatus) {
-    case 'up': return '正常'
-    case 'down': return '故障'
-    default: return '未知'
+  const map = {
+    up: '正常运行',
+    down: '服务故障',
+    unknown: '状态未知',
+    disabled: '已禁用'
   }
+  return map[statusClass.value] || '未知'
 })
 
 const typeText = computed(() => {
-  switch (props.monitor.type) {
-    case 'http': return 'HTTP/HTTPS'
-    case 'tcp': return 'TCP端口'
-    case 'ping': return 'PING'
-    default: return props.monitor.type
+  const map = {
+    http: 'HTTP',
+    tcp: 'TCP',
+    ping: 'PING'
   }
+  return map[props.monitor.type] || props.monitor.type
 })
-
-const formatTime = (time) => {
-  return formatTimeFromNow(time)
-}
-
-const handleCommand = (command) => {
-  switch (command) {
-    case 'view':
-      router.push(`/monitors/${props.monitor.id}`)
-      break
-    case 'edit':
-      router.push(`/monitors/${props.monitor.id}/edit`)
-      break
-    case 'toggle':
-      emit('toggle', props.monitor.id)
-      break
-    case 'delete':
-      emit('delete', props.monitor)
-      break
-  }
-}
 </script>
 
 <style scoped>
 .monitor-card {
-  transition: all 0.3s;
+  background: var(--md-surface);
+  border-radius: var(--md-shape-lg);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--md-outline-variant);
+  position: relative;
+  overflow: hidden;
 }
 
 .monitor-card:hover {
   transform: translateY(-2px);
+  box-shadow: var(--md-elevation-2);
 }
 
-.monitor-card.disabled {
-  opacity: 0.6;
+.monitor-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--md-outline);
 }
 
-.card-content {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.monitor-card.up::before {
+  background: var(--md-success);
+}
+
+.monitor-card.down::before {
+  background: var(--md-error);
+}
+
+.monitor-card.disabled::before {
+  background: var(--md-outline);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 16px;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--md-shape-full);
+  background: var(--md-outline);
 }
 
-.monitor-name {
-  font-size: 18px;
+.status-indicator.up {
+  background: var(--md-success);
+  box-shadow: 0 0 8px var(--md-success);
+}
+
+.status-indicator.down {
+  background: var(--md-error);
+  box-shadow: 0 0 8px var(--md-error);
+}
+
+.monitor-type-badge {
+  font-size: 0.75rem;
   font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.more-icon {
-  cursor: pointer;
-  font-size: 20px;
-  padding: 4px;
-}
-
-.more-icon:hover {
-  background: #f5f7fa;
-  border-radius: 4px;
+  color: var(--md-on-surface-variant);
+  background: var(--md-surface-variant);
+  padding: 4px 12px;
+  border-radius: var(--md-shape-full);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  margin-bottom: 16px;
 }
 
-.info-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.label {
-  color: #909399;
-  min-width: 70px;
-}
-
-.value {
-  color: #606266;
+.monitor-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--md-on-surface);
+  margin: 0 0 8px 0;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.monitor-target {
+  font-size: 0.875rem;
+  color: var(--md-on-surface-variant);
+  margin: 0 0 16px 0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--md-shape-full);
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: var(--md-surface-variant);
+  color: var(--md-on-surface-variant);
+}
+
+.status-badge.up {
+  background: var(--md-success-container);
+  color: var(--md-success);
+}
+
+.status-badge.down {
+  background: var(--md-error-container);
+  color: var(--md-error);
+}
+
+.metrics {
+  display: flex;
+  gap: 12px;
+}
+
+.metric {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.875rem;
+  color: var(--md-on-surface-variant);
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.uptime-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: var(--md-on-surface-variant);
+}
+
+.last-check {
+  font-size: 0.75rem;
+  color: var(--md-outline);
 }
 </style>

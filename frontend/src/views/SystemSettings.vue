@@ -1,0 +1,525 @@
+<template>
+  <div class="system-settings">
+    <el-row :gutter="24">
+      <!-- 网站基本信息 -->
+      <el-col :span="12">
+        <el-card>
+          <template #header>
+            <div class="card-header">
+              <el-icon><Setting /></el-icon>
+              <span>网站基本信息</span>
+            </div>
+          </template>
+          
+          <el-form
+            ref="siteFormRef"
+            :model="siteForm"
+            :rules="siteRules"
+            label-width="100px"
+            label-position="top"
+          >
+            <el-form-item label="网站名称" prop="siteName">
+              <el-input 
+                v-model="siteForm.siteName" 
+                placeholder="请输入网站名称"
+              />
+            </el-form-item>
+
+            <el-form-item label="网站URL" prop="siteUrl">
+              <el-input 
+                v-model="siteForm.siteUrl" 
+                placeholder="https://example.com"
+              />
+            </el-form-item>
+
+            <el-form-item label="网站介绍" prop="siteDescription">
+              <el-input
+                v-model="siteForm.siteDescription"
+                type="textarea"
+                :rows="4"
+                placeholder="请输入网站介绍"
+              />
+            </el-form-item>
+
+            <el-form-item>
+              <el-button 
+                type="primary" 
+                @click="saveSiteSettings"
+                :loading="savingSite"
+              >
+                <el-icon><Check /></el-icon>
+                保存设置
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </el-col>
+
+      <!-- 外观设置 -->
+      <el-col :span="12">
+        <el-card>
+          <template #header>
+            <div class="card-header">
+              <el-icon><Brush /></el-icon>
+              <span>外观设置</span>
+            </div>
+          </template>
+
+          <div class="theme-section">
+            <h4>主题模式</h4>
+            <div class="theme-options">
+              <div 
+                class="theme-option" 
+                :class="{ active: currentTheme === 'light' }"
+                @click="setTheme('light')"
+              >
+                <div class="theme-preview light">
+                  <div class="preview-header"></div>
+                  <div class="preview-content">
+                    <div class="preview-card"></div>
+                    <div class="preview-card"></div>
+                  </div>
+                </div>
+                <span class="theme-label">亮色模式</span>
+                <el-icon v-if="currentTheme === 'light'" class="check-icon"><Check /></el-icon>
+              </div>
+
+              <div 
+                class="theme-option" 
+                :class="{ active: currentTheme === 'dark' }"
+                @click="setTheme('dark')"
+              >
+                <div class="theme-preview dark">
+                  <div class="preview-header"></div>
+                  <div class="preview-content">
+                    <div class="preview-card"></div>
+                    <div class="preview-card"></div>
+                  </div>
+                </div>
+                <span class="theme-label">暗色模式</span>
+                <el-icon v-if="currentTheme === 'dark'" class="check-icon"><Check /></el-icon>
+              </div>
+
+              <div 
+                class="theme-option" 
+                :class="{ active: currentTheme === 'auto' }"
+                @click="setTheme('auto')"
+              >
+                <div class="theme-preview auto">
+                  <div class="preview-header"></div>
+                  <div class="preview-content">
+                    <div class="preview-card light"></div>
+                    <div class="preview-card dark"></div>
+                  </div>
+                </div>
+                <span class="theme-label">跟随系统</span>
+                <el-icon v-if="currentTheme === 'auto'" class="check-icon"><Check /></el-icon>
+              </div>
+            </div>
+          </div>
+
+          <el-divider />
+
+          <div class="accent-color-section">
+            <h4>强调色</h4>
+            <div class="color-options">
+              <div 
+                v-for="color in accentColors" 
+                :key="color.value"
+                class="color-option"
+                :class="{ active: currentAccent === color.value }"
+                @click="setAccentColor(color.value)"
+              >
+                <div class="color-circle" :style="{ backgroundColor: color.hex }"></div>
+                <span class="color-label">{{ color.label }}</span>
+                <el-icon v-if="currentAccent === color.value" class="check-icon"><Check /></el-icon>
+              </div>
+            </div>
+          </div>
+        </el-card>
+
+        <!-- 系统信息 -->
+        <el-card style="margin-top: 24px;">
+          <template #header>
+            <div class="card-header">
+              <el-icon><InfoFilled /></el-icon>
+              <span>系统信息</span>
+            </div>
+          </template>
+          
+          <div class="system-info">
+            <div class="info-item">
+              <span class="info-label">系统版本</span>
+              <span class="info-value">v1.0.0</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Node.js 版本</span>
+              <span class="info-value">{{ systemInfo.nodeVersion }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">数据库</span>
+              <span class="info-value">SQLite</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">运行时间</span>
+              <span class="info-value">{{ systemInfo.uptime }}</span>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+
+const siteFormRef = ref(null)
+const savingSite = ref(false)
+const currentTheme = ref('light')
+const currentAccent = ref('black')
+
+const siteForm = reactive({
+  siteName: 'Uptime',
+  siteUrl: '',
+  siteDescription: '服务状态监控系统'
+})
+
+const siteRules = {
+  siteName: [
+    { required: true, message: '请输入网站名称', trigger: 'blur' },
+    { min: 1, max: 50, message: '长度在1-50个字符', trigger: 'blur' }
+  ],
+  siteUrl: [
+    { type: 'url', message: '请输入有效的URL', trigger: 'blur' }
+  ]
+}
+
+const accentColors = [
+  { value: 'black', label: '经典黑', hex: '#1A1A1A' },
+  { value: 'blue', label: '科技蓝', hex: '#1976D2' },
+  { value: 'green', label: '自然绿', hex: '#388E3C' },
+  { value: 'purple', label: '优雅紫', hex: '#7B1FA2' },
+  { value: 'orange', label: '活力橙', hex: '#F57C00' },
+]
+
+const systemInfo = reactive({
+  nodeVersion: '',
+  uptime: '0天 0小时'
+})
+
+// 加载设置
+const loadSettings = () => {
+  const saved = localStorage.getItem('systemSettings')
+  if (saved) {
+    const settings = JSON.parse(saved)
+    Object.assign(siteForm, settings.site || {})
+    currentTheme.value = settings.theme || 'light'
+    currentAccent.value = settings.accent || 'black'
+  }
+}
+
+// 保存网站设置
+const saveSiteSettings = async () => {
+  try {
+    await siteFormRef.value.validate()
+    savingSite.value = true
+    
+    const settings = JSON.parse(localStorage.getItem('systemSettings') || '{}')
+    settings.site = { ...siteForm }
+    localStorage.setItem('systemSettings', JSON.stringify(settings))
+    
+    // 更新页面标题
+    document.title = siteForm.siteName
+    
+    ElMessage.success('网站设置已保存')
+  } catch (error) {
+    console.error(error)
+  } finally {
+    savingSite.value = false
+  }
+}
+
+// 设置主题
+const setTheme = (theme) => {
+  currentTheme.value = theme
+  const settings = JSON.parse(localStorage.getItem('systemSettings') || '{}')
+  settings.theme = theme
+  localStorage.setItem('systemSettings', JSON.stringify(settings))
+  
+  // 应用主题
+  applyTheme(theme)
+  ElMessage.success(`已切换到${theme === 'light' ? '亮色' : theme === 'dark' ? '暗色' : '跟随系统'}模式`)
+}
+
+// 应用主题
+const applyTheme = (theme) => {
+  const html = document.documentElement
+  if (theme === 'dark') {
+    html.classList.add('dark')
+  } else if (theme === 'light') {
+    html.classList.remove('dark')
+  } else {
+    // auto: 检测系统偏好
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    if (prefersDark) {
+      html.classList.add('dark')
+    } else {
+      html.classList.remove('dark')
+    }
+  }
+}
+
+// 设置强调色
+const setAccentColor = (color) => {
+  currentAccent.value = color
+  const settings = JSON.parse(localStorage.getItem('systemSettings') || '{}')
+  settings.accent = color
+  localStorage.setItem('systemSettings', JSON.stringify(settings))
+  
+  // 应用强调色
+  applyAccentColor(color)
+  ElMessage.success('强调色已更新')
+}
+
+// 应用强调色
+const applyAccentColor = (color) => {
+  const colorMap = {
+    black: '#1A1A1A',
+    blue: '#1976D2',
+    green: '#388E3C',
+    purple: '#7B1FA2',
+    orange: '#F57C00'
+  }
+  document.documentElement.style.setProperty('--md-primary', colorMap[color])
+}
+
+// 获取系统信息
+const loadSystemInfo = () => {
+  // 模拟系统信息
+  systemInfo.nodeVersion = 'v18.x.x'
+  systemInfo.uptime = '3天 12小时'
+}
+
+onMounted(() => {
+  loadSettings()
+  loadSystemInfo()
+  applyTheme(currentTheme.value)
+  applyAccentColor(currentAccent.value)
+})
+</script>
+
+<style scoped>
+.system-settings {
+  padding: 0;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--md-on-surface);
+}
+
+/* 主题选择 */
+.theme-section h4,
+.accent-color-section h4 {
+  margin: 0 0 16px 0;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--md-on-surface);
+}
+
+.theme-options {
+  display: flex;
+  gap: 16px;
+}
+
+.theme-option {
+  flex: 1;
+  cursor: pointer;
+  padding: 12px;
+  border-radius: var(--md-shape-md);
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.theme-option:hover {
+  background-color: var(--md-surface-variant);
+}
+
+.theme-option.active {
+  border-color: var(--md-primary);
+  background-color: var(--md-primary-container);
+}
+
+.theme-preview {
+  width: 100%;
+  height: 80px;
+  border-radius: var(--md-shape-sm);
+  overflow: hidden;
+  margin-bottom: 8px;
+  border: 1px solid var(--md-outline-variant);
+}
+
+.theme-preview.light {
+  background-color: #FFFFFF;
+}
+
+.theme-preview.dark {
+  background-color: #1A1A1A;
+}
+
+.theme-preview.auto {
+  background: linear-gradient(135deg, #FFFFFF 50%, #1A1A1A 50%);
+}
+
+.preview-header {
+  height: 20px;
+  background-color: rgba(128, 128, 128, 0.2);
+}
+
+.preview-content {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.preview-card {
+  height: 16px;
+  border-radius: 4px;
+  background-color: rgba(128, 128, 128, 0.15);
+}
+
+.preview-card.light {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.preview-card.dark {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.theme-label {
+  display: block;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--md-on-surface-variant);
+}
+
+.theme-option.active .theme-label {
+  color: var(--md-primary);
+  font-weight: 500;
+}
+
+.check-icon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: var(--md-primary);
+  font-size: 1.25rem;
+}
+
+/* 强调色选择 */
+.accent-color-section {
+  margin-top: 24px;
+}
+
+.color-options {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.color-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 12px 16px;
+  border-radius: var(--md-shape-md);
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  position: relative;
+  min-width: 80px;
+}
+
+.color-option:hover {
+  background-color: var(--md-surface-variant);
+}
+
+.color-option.active {
+  border-color: var(--md-primary);
+  background-color: var(--md-primary-container);
+}
+
+.color-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--md-outline-variant);
+}
+
+.color-label {
+  font-size: 0.875rem;
+  color: var(--md-on-surface-variant);
+}
+
+.color-option.active .color-label {
+  color: var(--md-primary);
+  font-weight: 500;
+}
+
+/* 系统信息 */
+.system-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.info-item:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 0.875rem;
+  color: var(--md-on-surface-variant);
+}
+
+.info-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--md-on-surface);
+  font-family: monospace;
+}
+
+/* 表单样式 */
+:deep(.el-form-item__label) {
+  color: var(--md-on-surface-variant) !important;
+  font-weight: 500;
+  padding-bottom: 8px;
+}
+
+:deep(.el-input__wrapper) {
+  background-color: var(--md-surface-variant) !important;
+  border-color: var(--md-outline-variant) !important;
+}
+
+:deep(.el-textarea__inner) {
+  background-color: var(--md-surface-variant) !important;
+  border-color: var(--md-outline-variant) !important;
+}
+</style>

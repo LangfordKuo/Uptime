@@ -92,6 +92,18 @@ class StatusPageController {
       // 获取关联的监控项
       const monitors = StatusPageModel.getMonitors(statusPage.id);
 
+      // 计算最新的更新时间（取所有监控项中最新的检查时间）
+      let latestUpdate = statusPage.updated_at || statusPage.created_at;
+      monitors.forEach(monitor => {
+        if (monitor.latest_check) {
+          const checkTime = new Date(monitor.latest_check);
+          const currentLatest = new Date(latestUpdate);
+          if (checkTime > currentLatest) {
+            latestUpdate = monitor.latest_check;
+          }
+        }
+      });
+
       res.json({
         success: true,
         data: {
@@ -101,6 +113,7 @@ class StatusPageController {
           description: statusPage.description,
           logo_url: statusPage.logo_url,
           created_at: statusPage.created_at,
+          updated_at: latestUpdate,
           monitors
         }
       });
