@@ -71,6 +71,12 @@ const routes = [
     meta: { requiresAuth: false }
   },
   {
+    path: '/status/:slug',
+    name: 'PublicStatusPage',
+    component: () => import('@/views/PublicStatusPage.vue'),
+    meta: { requiresAuth: false, skipInstallCheck: true }
+  },
+  {
     path: '/',
     component: () => import('@/views/Layout.vue'),
     meta: { requiresAuth: true },
@@ -102,6 +108,12 @@ const routes = [
         name: 'UserManagement',
         component: () => import('@/views/UserManagement.vue'),
         meta: { requiresAuth: true }
+      },
+      {
+        path: 'status-pages',
+        name: 'StatusPageManagement',
+        component: () => import('@/views/StatusPageManagement.vue'),
+        meta: { requiresRole: ['admin'] }
       }
     ]
   }

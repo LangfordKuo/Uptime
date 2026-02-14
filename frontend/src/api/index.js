@@ -102,3 +102,35 @@ export const dashboardApi = {
     return request.get('/dashboard');
   }
 };
+
+export const statusPageApi = {
+  // 获取所有状态页
+  getAll() {
+    return request.get('/status-pages');
+  },
+
+  // 获取单个状态页
+  getById(id) {
+    return request.get(`/status-pages/${id}`);
+  },
+
+  // 创建状态页
+  create(data) {
+    return request.post('/status-pages', data);
+  },
+
+  // 更新状态页
+  update(id, data) {
+    return request.put(`/status-pages/${id}`, data);
+  },
+
+  // 删除状态页
+  delete(id) {
+    return request.delete(`/status-pages/${id}`);
+  },
+
+  // 获取公开状态页（访客访问）
+  getPublic(slug) {
+    return request.get(`/status-pages/public/${slug}`);
+  }
+};

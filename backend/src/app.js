@@ -18,6 +18,7 @@ import createMonitorRoutes from './routes/monitors.js';
 import createDashboardRoutes from './routes/dashboard.js';
 import authRoutes from './routes/auth.js';
 import installRoutes from './routes/install.js';
+import statusPageRoutes from './routes/statusPages.js';
 import { authenticate, authorize, optionalAuth } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -99,6 +100,9 @@ async function startServer() {
   
   // 监控项路由（需要登录，管理员和普通用户可操作）
   app.use('/api/monitors', authenticate, authorize('admin', 'user'), createMonitorRoutes(monitorController));
+
+  // 状态页路由
+  app.use('/api/status-pages', statusPageRoutes);
 
   // 健康检查端点
   app.get('/health', (req, res) => {

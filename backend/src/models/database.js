@@ -229,6 +229,37 @@ export async function initializeDatabase() {
     )
   `);
 
+  // 创建 status_pages 表
+  dbWrapper.exec(`
+    CREATE TABLE IF NOT EXISTS status_pages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      description TEXT,
+      logo_url TEXT,
+      is_public INTEGER DEFAULT 1,
+      created_by INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // 创建 status_page_monitors 关联表
+  dbWrapper.exec(`
+    CREATE TABLE IF NOT EXISTS status_page_monitors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      status_page_id INTEGER NOT NULL,
+      monitor_id INTEGER NOT NULL,
+      display_name TEXT,
+      display_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (status_page_id) REFERENCES status_pages(id) ON DELETE CASCADE,
+      FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE,
+      UNIQUE(status_page_id, monitor_id)
+    )
+  `);
+
   console.log('Database tables initialized successfully');
 }
 
@@ -307,6 +338,37 @@ export async function createDatabaseTables() {
       role TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('admin', 'user', 'viewer')),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 创建 status_pages 表
+  dbWrapper.exec(`
+    CREATE TABLE IF NOT EXISTS status_pages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      description TEXT,
+      logo_url TEXT,
+      is_public INTEGER DEFAULT 1,
+      created_by INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // 创建 status_page_monitors 关联表
+  dbWrapper.exec(`
+    CREATE TABLE IF NOT EXISTS status_page_monitors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      status_page_id INTEGER NOT NULL,
+      monitor_id INTEGER NOT NULL,
+      display_name TEXT,
+      display_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (status_page_id) REFERENCES status_pages(id) ON DELETE CASCADE,
+      FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE,
+      UNIQUE(status_page_id, monitor_id)
     )
   `);
 

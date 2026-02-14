@@ -27,7 +27,11 @@
                   <el-dropdown-item disabled>
                     <el-tag :type="roleType" size="small">{{ roleText }}</el-tag>
                   </el-dropdown-item>
-                  <el-dropdown-item command="users">
+                  <el-dropdown-item command="statusPages" v-if="authStore.isAdmin">
+                    <el-icon><Document /></el-icon>
+                    状态页管理
+                  </el-dropdown-item>
+                  <el-dropdown-item command="users" v-if="authStore.isAdmin">
                     <el-icon><UserFilled /></el-icon>
                     用户管理
                   </el-dropdown-item>
@@ -94,6 +98,8 @@ const handleCommand = async (command) => {
     }
   } else if (command === 'users') {
     router.push('/users')
+  } else if (command === 'statusPages') {
+    router.push('/status-pages')
   }
 }
 
