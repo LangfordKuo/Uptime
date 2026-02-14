@@ -1,4 +1,5 @@
 import SystemSettingModel from '../models/SystemSetting.js';
+import { TIMEZONES, DATE_FORMATS } from '../utils/timezone.js';
 
 class SystemSettingController {
   // 获取所有设置
@@ -100,6 +101,69 @@ class SystemSettingController {
       res.status(500).json({
         success: false,
         message: '保存设置失败',
+        error: error.message
+      });
+    }
+  };
+
+  // 获取时区设置
+  getTimezoneSettings = async (req, res) => {
+    try {
+      const settings = SystemSettingModel.getTimezoneSettings();
+      res.json({
+        success: true,
+        data: settings
+      });
+    } catch (error) {
+      console.error('Error getting timezone settings:', error);
+      res.status(500).json({
+        success: false,
+        message: '获取时区设置失败',
+        error: error.message
+      });
+    }
+  };
+
+  // 保存时区设置
+  saveTimezoneSettings = async (req, res) => {
+    try {
+      const { timezone, dateFormat } = req.body;
+      
+      const settings = SystemSettingModel.saveTimezoneSettings({
+        timezone,
+        dateFormat
+      });
+
+      res.json({
+        success: true,
+        data: settings,
+        message: '时区设置已保存'
+      });
+    } catch (error) {
+      console.error('Error saving timezone settings:', error);
+      res.status(500).json({
+        success: false,
+        message: '保存时区设置失败',
+        error: error.message
+      });
+    }
+  };
+
+  // 获取时区选项列表
+  getTimezoneOptions = async (req, res) => {
+    try {
+      res.json({
+        success: true,
+        data: {
+          timezones: TIMEZONES,
+          dateFormats: DATE_FORMATS
+        }
+      });
+    } catch (error) {
+      console.error('Error getting timezone options:', error);
+      res.status(500).json({
+        success: false,
+        message: '获取时区选项失败',
         error: error.message
       });
     }

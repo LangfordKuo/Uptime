@@ -87,7 +87,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { statusPageApi } from '@/api'
-import { formatTime } from '@/utils/datetime'
+import { loadTimezoneSettings, formatWithSystemTimezone } from '@/utils/timezone'
 
 const route = useRoute()
 const statusPage = ref(null)
@@ -146,8 +146,17 @@ const getTodayUptimeColor = (dailyUptime) => {
   return 'critical'
 }
 
+// 格式化时间（使用时区设置）
+const formatTime = (time) => {
+  if (!time) return '--'
+  return formatWithSystemTimezone(time)
+}
+
 const loadStatusPage = async () => {
   try {
+    // 先加载时区设置
+    await loadTimezoneSettings()
+    
     const res = await statusPageApi.getPublic(route.params.slug)
     statusPage.value = res.data
     

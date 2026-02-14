@@ -78,6 +78,25 @@ class SystemSettingModel {
     }
     return this.getSiteSettings();
   }
+
+  // 获取时区设置
+  static getTimezoneSettings() {
+    return {
+      timezone: this.get('timezone', 'UTC'),
+      dateFormat: this.get('date_format', 'YYYY-MM-DD HH:mm:ss')
+    };
+  }
+
+  // 保存时区设置
+  static saveTimezoneSettings(settings) {
+    if (settings.timezone !== undefined) {
+      this.set('timezone', settings.timezone);
+    }
+    if (settings.dateFormat !== undefined) {
+      this.set('date_format', settings.dateFormat);
+    }
+    return this.getTimezoneSettings();
+  }
 }
 
 export default SystemSettingModel;

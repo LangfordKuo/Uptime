@@ -138,6 +138,78 @@
           </div>
         </el-card>
 
+        <!-- 时区设置 -->
+        <el-card style="margin-top: 24px;">
+          <template #header>
+            <div class="card-header">
+              <el-icon><Clock /></el-icon>
+              <span>时区设置</span>
+            </div>
+          </template>
+          
+          <el-form
+            :model="timezoneForm"
+            label-width="100px"
+            label-position="top"
+          >
+            <el-form-item label="显示时区">
+              <el-select 
+                v-model="timezoneForm.timezone" 
+                placeholder="选择时区"
+                style="width: 100%"
+                filterable
+              >
+                <el-option
+                  v-for="tz in timezoneOptions"
+                  :key="tz.value"
+                  :label="tz.label"
+                  :value="tz.value"
+                />
+              </el-select>
+              <div class="form-hint">选择后，所有时间显示将使用该时区</div>
+            </el-form-item>
+
+            <el-form-item label="日期时间格式">
+              <el-select 
+                v-model="timezoneForm.dateFormat" 
+                placeholder="选择格式"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="fmt in dateFormatOptions"
+                  :key="fmt.value"
+                  :label="fmt.label"
+                  :value="fmt.value"
+                />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="预览">
+              <div class="timezone-preview">
+                <div class="preview-item">
+                  <span class="preview-label">当前时间：</span>
+                  <span class="preview-value">{{ formattedCurrentTime }}</span>
+                </div>
+                <div class="preview-item">
+                  <span class="preview-label">UTC时间：</span>
+                  <span class="preview-value">{{ utcCurrentTime }}</span>
+                </div>
+              </div>
+            </el-form-item>
+
+            <el-form-item>
+              <el-button 
+                type="primary" 
+                @click="saveTimezoneSettings"
+                :loading="savingTimezone"
+              >
+                <el-icon><Check /></el-icon>
+                保存时区设置
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+
         <!-- 系统信息 -->
         <el-card style="margin-top: 24px;">
           <template #header>
@@ -172,19 +244,29 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { settingsApi } from '@/api'
+import { Clock } from '@element-plus/icons-vue'
 
 const siteFormRef = ref(null)
 const savingSite = ref(false)
 const currentTheme = ref('light')
 const currentAccent = ref('black')
+const savingTimezone = ref(false)
+const timezoneOptions = ref([])
+const dateFormatOptions = ref([])
+const currentTime = ref(new Date())
 
 const siteForm = reactive({
   siteName: 'Uptime',
   siteUrl: '',
   siteDescription: '服务状态监控系统'
+})
+
+const timezoneForm = reactive({
+  timezone: 'UTC',
+  dateFormat: 'YYYY-MM-DD HH:mm:ss'
 })
 
 const siteRules = {
@@ -224,6 +306,27 @@ const loadSettings = async () => {
     console.error('加载设置失败:', error)
   }
   
+  // 加载时区设置
+  try {
+    const tzRes = await settingsApi.getTimezoneSettings()
+    if (tzRes.data) {
+      Object.assign(timezoneForm, tzRes.data)
+    }
+  } catch (error) {
+    console.error('加载时区设置失败:', error)
+  }
+  
+  // 加载时区选项
+  try {
+    const optionsRes = await settingsApi.getTimezoneOptions()
+    if (optionsRes.data) {
+      timezoneOptions.value = optionsRes.data.timezones
+      dateFormatOptions.value = optionsRes.data.dateFormats
+    }
+  } catch (error) {
+    console.error('加载时区选项失败:', error)
+  }
+  
   // 从本地存储加载主题和强调色（这些保存在本地）
   const saved = localStorage.getItem('systemSettings')
   if (saved) {
@@ -232,6 +335,93 @@ const loadSettings = async () => {
     currentAccent.value = settings.accent || 'black'
   }
 }
+
+// 保存时区设置
+const saveTimezoneSettings = async () => {
+  try {
+    savingTimezone.value = true
+    await settingsApi.saveTimezoneSettings({
+      timezone: timezoneForm.timezone,
+      dateFormat: timezoneForm.dateFormat
+    })
+    ElMessage.success('时区设置已保存')
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('保存失败')
+  } finally {
+    savingTimezone.value = false
+  }
+}
+
+// 格式化日期时间
+const formatDateTime = (date, timezone, format) => {
+  if (!date) return ''
+  
+  try {
+    // 创建 UTC 时间的 Date 对象
+    const utcDate = new Date(date)
+    
+    if (timezone === 'UTC') {
+      const year = utcDate.getUTCFullYear()
+      const month = String(utcDate.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(utcDate.getUTCDate()).padStart(2, '0')
+      const hour = String(utcDate.getUTCHours()).padStart(2, '0')
+      const minute = String(utcDate.getUTCMinutes()).padStart(2, '0')
+      const second = String(utcDate.getUTCSeconds()).padStart(2, '0')
+      
+      return format
+        .replace('YYYY', year)
+        .replace('MM', month)
+        .replace('DD', day)
+        .replace('HH', hour)
+        .replace('mm', minute)
+        .replace('ss', second)
+    }
+    
+    // 使用 Intl.DateTimeFormat 进行时区转换
+    const options = {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }
+    
+    const formatter = new Intl.DateTimeFormat('en-US', options)
+    const parts = formatter.formatToParts(utcDate)
+    
+    const year = parts.find(p => p.type === 'year').value
+    const month = parts.find(p => p.type === 'month').value
+    const day = parts.find(p => p.type === 'day').value
+    const hour = parts.find(p => p.type === 'hour').value
+    const minute = parts.find(p => p.type === 'minute').value
+    const second = parts.find(p => p.type === 'second').value
+    
+    return format
+      .replace('YYYY', year)
+      .replace('MM', month)
+      .replace('DD', day)
+      .replace('HH', hour)
+      .replace('mm', minute)
+      .replace('ss', second)
+  } catch (error) {
+    console.error('时间格式化错误:', error)
+    return date.toString()
+  }
+}
+
+// 计算属性：格式化的当前时间
+const formattedCurrentTime = computed(() => {
+  return formatDateTime(currentTime.value, timezoneForm.timezone, timezoneForm.dateFormat)
+})
+
+// 计算属性：UTC当前时间
+const utcCurrentTime = computed(() => {
+  return formatDateTime(currentTime.value, 'UTC', 'YYYY-MM-DD HH:mm:ss')
+})
 
 // 保存网站设置
 const saveSiteSettings = async () => {
@@ -324,6 +514,11 @@ onMounted(() => {
   loadSystemInfo()
   applyTheme(currentTheme.value)
   applyAccentColor(currentAccent.value)
+  
+  // 每秒更新当前时间用于预览
+  setInterval(() => {
+    currentTime.value = new Date()
+  }, 1000)
 })
 </script>
 
@@ -538,5 +733,42 @@ onMounted(() => {
 :deep(.el-textarea__inner) {
   background-color: var(--md-surface-variant) !important;
   border-color: var(--md-outline-variant) !important;
+}
+
+/* 时区设置样式 */
+.form-hint {
+  font-size: 0.75rem;
+  color: var(--md-on-surface-variant);
+  margin-top: 4px;
+}
+
+.timezone-preview {
+  background: var(--md-surface-variant);
+  border-radius: var(--md-shape-sm);
+  padding: 12px 16px;
+}
+
+.preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.preview-item:last-child {
+  border-bottom: none;
+}
+
+.preview-label {
+  font-size: 0.875rem;
+  color: var(--md-on-surface-variant);
+}
+
+.preview-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--md-on-surface);
+  font-family: monospace;
 }
 </style>

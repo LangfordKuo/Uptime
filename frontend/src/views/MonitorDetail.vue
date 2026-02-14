@@ -133,7 +133,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
-import { formatTime, parseUTCTime } from '@/utils/datetime'
+import { loadTimezoneSettings, formatWithSystemTimezone } from '@/utils/timezone'
 import { monitorApi } from '@/api'
 
 const route = useRoute()
@@ -165,7 +165,8 @@ const statusText = computed(() => {
 })
 
 const formatDateTime = (time) => {
-  return formatTime(time, 'YYYY-MM-DD HH:mm:ss')
+  if (!time) return '-'
+  return formatWithSystemTimezone(time)
 }
 
 const formatDuration = (seconds) => {
@@ -190,7 +191,7 @@ const initChart = () => {
     },
     xAxis: {
       type: 'category',
-      data: stats.value.trend?.map(item => parseUTCTime(item.time_slot).format('MM-DD HH:mm')) || []
+      data: stats.value.trend?.map(item => formatDateTime(item.time_slot).slice(5, 16)) || []
     },
     yAxis: {
       type: 'value',
@@ -221,6 +222,9 @@ const initChart = () => {
 const refreshData = async () => {
   loading.value = true
   try {
+    // 先加载时区设置
+    await loadTimezoneSettings()
+    
     const [monitorRes, statsRes, resultsRes, incidentsRes] = await Promise.all([
       monitorApi.getById(route.params.id),
       monitorApi.getStats(route.params.id),

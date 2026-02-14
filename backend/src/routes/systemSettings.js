@@ -7,9 +7,16 @@ const router = Router();
 // 获取网站设置（公开）
 router.get('/site', systemSettingController.getSiteSettings);
 
+// 获取时区设置（公开）
+router.get('/timezone', systemSettingController.getTimezoneSettings);
+
+// 获取时区选项列表（公开）
+router.get('/timezone/options', systemSettingController.getTimezoneOptions);
+
 // 以下接口需要管理员权限
 router.get('/', authenticate, authorize('admin'), systemSettingController.getAllSettings);
 router.post('/site', authenticate, authorize('admin'), systemSettingController.saveSiteSettings);
+router.post('/timezone', authenticate, authorize('admin'), systemSettingController.saveTimezoneSettings);
 router.get('/:key', authenticate, authorize('admin'), systemSettingController.getSetting);
 router.post('/:key', authenticate, authorize('admin'), systemSettingController.setSetting);
 

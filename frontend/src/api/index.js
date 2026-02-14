@@ -146,6 +146,21 @@ export const settingsApi = {
     return request.post('/settings/site', data);
   },
 
+  // 获取时区设置（公开）
+  getTimezoneSettings() {
+    return request.get('/settings/timezone');
+  },
+
+  // 保存时区设置（需要管理员权限）
+  saveTimezoneSettings(data) {
+    return request.post('/settings/timezone', data);
+  },
+
+  // 获取时区选项列表（公开）
+  getTimezoneOptions() {
+    return request.get('/settings/timezone/options');
+  },
+
   // 获取所有设置（需要管理员权限）
   getAllSettings() {
     return request.get('/settings');
