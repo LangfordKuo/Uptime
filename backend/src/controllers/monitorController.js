@@ -62,11 +62,17 @@ class MonitorController {
         });
       }
 
+      // 附加最新状态信息
+      const latestResult = MonitorModel.getLatestCheckResult(monitor.id);
+
       res.json({
         success: true,
         data: {
           ...monitor,
-          config: monitor.config ? JSON.parse(monitor.config) : null
+          config: monitor.config ? JSON.parse(monitor.config) : null,
+          latestStatus: latestResult?.status || 'unknown',
+          latestResponseTime: latestResult?.response_time || null,
+          latestCheck: latestResult?.checked_at || null
         }
       });
     } catch (error) {

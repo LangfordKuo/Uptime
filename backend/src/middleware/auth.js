@@ -1,5 +1,4 @@
 import jwt from 'jsonwebtoken';
-import UserModel from '../models/User.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'uptime-monitor-secret-key-change-in-production';
 
@@ -28,17 +27,17 @@ export function authenticate(req, res, next) {
       });
     }
 
+    // 验证并解码 Token
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = UserModel.getById(decoded.id);
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: '用户不存在'
-      });
-    }
-
-    req.user = user;
+    
+    // 直接使用 Token 中的用户信息，不查询数据库
+    // Token 中已包含 id, username, role 等必要信息
+    req.user = {
+      id: decoded.id,
+      username: decoded.username,
+      role: decoded.role
+    };
+    
     next();
   } catch (error) {
     return res.status(401).json({
@@ -77,13 +76,14 @@ export function optionalAuth(req, res, next) {
     if (token) {
       try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        const user = UserModel.getById(decoded.id);
-        if (user) {
-          req.user = user;
-        }
-      } catch (dbError) {
-        // 数据库可能不存在或表不存在，忽略错误
-        console.log('Optional auth DB error (ignored):', dbError.message);
+        // 直接使用 Token 中的用户信息
+        req.user = {
+          id: decoded.id,
+          username: decoded.username,
+          role: decoded.role
+        };
+      } catch (error) {
+        // Token 无效或过期，忽略错误
       }
     }
   } catch (error) {

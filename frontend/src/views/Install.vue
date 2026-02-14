@@ -116,6 +116,7 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { installApi } from '@/api'
+import { clearInstallCache } from '@/router'
 
 const router = useRouter()
 
@@ -177,6 +178,9 @@ const handleInstall = async () => {
     installing.value = true
     
     await installApi.install(form)
+    
+    // 清除安装检查缓存，下次路由切换时会重新检查
+    clearInstallCache()
     
     ElMessage.success('安装成功')
     currentStep.value = 2

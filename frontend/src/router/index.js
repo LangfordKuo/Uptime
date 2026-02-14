@@ -2,6 +2,61 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { installApi } from '@/api'
 
+// 安装状态缓存
+const INSTALL_CACHE_KEY = 'uptime_installed'
+let installCheckCache = null
+let installCheckPromise = null
+
+// 初始化缓存（从 sessionStorage 读取）
+function initInstallCache() {
+  const cached = sessionStorage.getItem(INSTALL_CACHE_KEY)
+  if (cached !== null) {
+    installCheckCache = cached === 'true'
+  }
+}
+
+// 检查安装状态（带缓存）
+async function checkInstallStatus() {
+  // 首次调用时尝试从 sessionStorage 读取
+  if (installCheckCache === null) {
+    initInstallCache()
+  }
+  
+  // 如果已有缓存，直接返回
+  if (installCheckCache !== null) {
+    return installCheckCache
+  }
+  
+  // 如果正在检查中，等待该请求完成
+  if (installCheckPromise) {
+    return installCheckPromise
+  }
+  
+  // 发起新的检查请求
+  installCheckPromise = installApi.checkInstalled()
+    .then(res => {
+      installCheckCache = res.data.installed
+      // 将结果缓存到 sessionStorage
+      sessionStorage.setItem(INSTALL_CACHE_KEY, String(installCheckCache))
+      return installCheckCache
+    })
+    .catch(error => {
+      console.error('Check install error:', error)
+      return false
+    })
+    .finally(() => {
+      installCheckPromise = null
+    })
+  
+  return installCheckPromise
+}
+
+// 清除安装检查缓存（在安装完成后调用）
+export function clearInstallCache() {
+  installCheckCache = null
+  sessionStorage.removeItem(INSTALL_CACHE_KEY)
+}
+
 const routes = [
   {
     path: '/install',
@@ -64,8 +119,8 @@ router.beforeEach(async (to, from, next) => {
   // 检查系统是否已安装（除了安装页面本身）
   if (!to.meta.skipInstallCheck) {
     try {
-      const res = await installApi.checkInstalled()
-      if (!res.data.installed) {
+      const installed = await checkInstallStatus()
+      if (!installed) {
         // 未安装，跳转到安装页面
         if (to.path !== '/install') {
           next('/install')
