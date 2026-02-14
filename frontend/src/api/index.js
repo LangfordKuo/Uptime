@@ -134,3 +134,30 @@ export const statusPageApi = {
     return request.get(`/status-pages/public/${slug}`);
   }
 };
+
+export const settingsApi = {
+  // 获取网站设置（公开）
+  getSiteSettings() {
+    return request.get('/settings/site');
+  },
+
+  // 保存网站设置（需要管理员权限）
+  saveSiteSettings(data) {
+    return request.post('/settings/site', data);
+  },
+
+  // 获取所有设置（需要管理员权限）
+  getAllSettings() {
+    return request.get('/settings');
+  },
+
+  // 获取单个设置（需要管理员权限）
+  getSetting(key) {
+    return request.get(`/settings/${key}`);
+  },
+
+  // 设置单个值（需要管理员权限）
+  setSetting(key, value) {
+    return request.post(`/settings/${key}`, { value });
+  }
+};

@@ -19,6 +19,7 @@ import createDashboardRoutes from './routes/dashboard.js';
 import authRoutes from './routes/auth.js';
 import installRoutes from './routes/install.js';
 import statusPageRoutes from './routes/statusPages.js';
+import systemSettingRoutes from './routes/systemSettings.js';
 import { authenticate, authorize, optionalAuth } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -47,14 +48,20 @@ async function startServer() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // 日志中间件
+  // 错误日志中间件（仅记录错误请求）
   app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    const originalSend = res.send;
+    res.send = function(body) {
+      // 记录 4xx 和 5xx 错误
+      if (res.statusCode >= 400) {
+        console.error(`[${new Date().toISOString()}] ERROR ${res.statusCode} ${req.method} ${req.url}`);
+      }
+      return originalSend.call(this, body);
+    };
     next();
   });
 
   // 初始化数据库
-  console.log('Initializing database...');
   await initializeDatabase();
 
   // 检查数据库是否已安装
@@ -68,7 +75,6 @@ async function startServer() {
     schedulerService = new SchedulerService(monitorService);
     monitorController = new MonitorController(schedulerService);
   } else {
-    console.log('Database not installed. Monitoring services will not be started.');
     // 创建空的控制器用于路由注册
     const notInstalledResponse = (req, res) => {
       res.status(503).json({ success: false, message: 'System not installed' });
@@ -103,6 +109,9 @@ async function startServer() {
 
   // 状态页路由
   app.use('/api/status-pages', statusPageRoutes);
+
+  // 系统设置路由
+  app.use('/api/settings', systemSettingRoutes);
 
   // 健康检查端点
   app.get('/health', (req, res) => {
@@ -142,45 +151,31 @@ async function startServer() {
 
   // 启动调度器（仅在已安装时）
   if (isInstalled && schedulerService) {
-    console.log('Starting scheduler...');
     schedulerService.initializeSchedules();
 
     // 设置定期数据清理任务
     cron.schedule(config.cleanupInterval, () => {
-      console.log('Running scheduled data cleanup...');
       StatisticsService.cleanupOldData(config.dataRetentionDays);
     });
-  } else {
-    console.log('Scheduler not started (system not installed)');
   }
 
   // 启动服务器
   const PORT = config.port;
   httpServer.listen(PORT, () => {
-    console.log(`=================================`);
-    console.log(`Uptime Monitor Server Started`);
-    console.log(`=================================`);
-    console.log(`Server running on port ${PORT}`);
-    console.log(`API available at http://localhost:${PORT}/api`);
-    console.log(`Health check: http://localhost:${PORT}/health`);
-    console.log(`=================================`);
+    console.log(`Server started on port ${PORT}`);
   });
 
   // 优雅关闭
   process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down gracefully...');
-    schedulerService.stopAll();
+    schedulerService?.stopAll();
     httpServer.close(() => {
-      console.log('Server closed');
       process.exit(0);
     });
   });
 
   process.on('SIGINT', () => {
-    console.log('\nSIGINT received, shutting down gracefully...');
-    schedulerService.stopAll();
+    schedulerService?.stopAll();
     httpServer.close(() => {
-      console.log('Server closed');
       process.exit(0);
     });
   });

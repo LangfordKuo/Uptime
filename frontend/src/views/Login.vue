@@ -5,8 +5,8 @@
         <div class="logo">
           <el-icon :size="64" color="var(--md-primary)"><Monitor /></el-icon>
         </div>
-        <h1>Uptime Monitor</h1>
-        <p>服务状态监控系统</p>
+        <h1>{{ siteSettings.siteName }}</h1>
+        <p>{{ siteSettings.siteDescription }}</p>
       </div>
 
       <div class="form-section">
@@ -59,11 +59,12 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { settingsApi } from '@/api'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -74,6 +75,30 @@ const loading = ref(false)
 const form = reactive({
   username: '',
   password: ''
+})
+
+const siteSettings = reactive({
+  siteName: 'Uptime',
+  siteDescription: '服务状态监控系统'
+})
+
+// 加载网站设置
+const loadSiteSettings = async () => {
+  try {
+    const res = await settingsApi.getSiteSettings()
+    if (res.data) {
+      siteSettings.siteName = res.data.siteName || 'Uptime'
+      siteSettings.siteDescription = res.data.siteDescription || '服务状态监控系统'
+      // 更新页面标题
+      document.title = siteSettings.siteName
+    }
+  } catch (error) {
+    console.error('加载网站设置失败:', error)
+  }
+}
+
+onMounted(() => {
+  loadSiteSettings()
 })
 
 const rules = {
@@ -111,7 +136,7 @@ const handleLogin = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #6750A4 0%, #7D5260 100%);
+  background: #F5F5F5;
   padding: 20px;
 }
 
@@ -128,7 +153,7 @@ const handleLogin = async () => {
 
 .brand-section {
   flex: 1;
-  background: linear-gradient(135deg, var(--md-primary) 0%, var(--md-tertiary) 100%);
+  background: var(--md-primary);
   display: flex;
   flex-direction: column;
   align-items: center;

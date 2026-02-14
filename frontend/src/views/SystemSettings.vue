@@ -174,6 +174,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { settingsApi } from '@/api'
 
 const siteFormRef = ref(null)
 const savingSite = ref(false)
@@ -210,11 +211,23 @@ const systemInfo = reactive({
 })
 
 // 加载设置
-const loadSettings = () => {
+const loadSettings = async () => {
+  try {
+    // 从后端加载网站设置
+    const res = await settingsApi.getSiteSettings()
+    if (res.data) {
+      Object.assign(siteForm, res.data)
+      // 更新页面标题
+      document.title = siteForm.siteName
+    }
+  } catch (error) {
+    console.error('加载设置失败:', error)
+  }
+  
+  // 从本地存储加载主题和强调色（这些保存在本地）
   const saved = localStorage.getItem('systemSettings')
   if (saved) {
     const settings = JSON.parse(saved)
-    Object.assign(siteForm, settings.site || {})
     currentTheme.value = settings.theme || 'light'
     currentAccent.value = settings.accent || 'black'
   }
@@ -226,9 +239,12 @@ const saveSiteSettings = async () => {
     await siteFormRef.value.validate()
     savingSite.value = true
     
-    const settings = JSON.parse(localStorage.getItem('systemSettings') || '{}')
-    settings.site = { ...siteForm }
-    localStorage.setItem('systemSettings', JSON.stringify(settings))
+    // 保存到后端
+    await settingsApi.saveSiteSettings({
+      siteName: siteForm.siteName,
+      siteUrl: siteForm.siteUrl,
+      siteDescription: siteForm.siteDescription
+    })
     
     // 更新页面标题
     document.title = siteForm.siteName
@@ -236,6 +252,7 @@ const saveSiteSettings = async () => {
     ElMessage.success('网站设置已保存')
   } catch (error) {
     console.error(error)
+    ElMessage.error('保存失败')
   } finally {
     savingSite.value = false
   }

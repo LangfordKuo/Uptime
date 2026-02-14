@@ -260,6 +260,17 @@ export async function initializeDatabase() {
     )
   `);
 
+  // 创建系统设置表
+  dbWrapper.exec(`
+    CREATE TABLE IF NOT EXISTS system_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT NOT NULL UNIQUE,
+      value TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   console.log('Database tables initialized successfully');
 }
 
@@ -369,6 +380,17 @@ export async function createDatabaseTables() {
       FOREIGN KEY (status_page_id) REFERENCES status_pages(id) ON DELETE CASCADE,
       FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE,
       UNIQUE(status_page_id, monitor_id)
+    )
+  `);
+
+  // 创建系统设置表
+  dbWrapper.exec(`
+    CREATE TABLE IF NOT EXISTS system_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT NOT NULL UNIQUE,
+      value TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 

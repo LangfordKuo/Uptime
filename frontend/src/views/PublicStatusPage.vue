@@ -38,10 +38,8 @@
           >
             <div class="service-header">
               <div class="service-info">
-                <div class="service-name">
-                  <div class="status-dot" :class="monitor.latest_status || 'unknown'"></div>
-                  <span>{{ monitor.display_name || monitor.name }}</span>
-                </div>
+                <div class="status-dot" :class="monitor.latest_status || 'unknown'"></div>
+                <span class="service-name">{{ monitor.display_name || monitor.name }}</span>
                 <span class="service-type">{{ getTypeText(monitor.type) }}</span>
               </div>
               <div class="service-status">
@@ -52,6 +50,14 @@
                   {{ monitor.latest_response_time }}ms
                 </span>
               </div>
+            </div>
+
+            <!-- 今日在线率 -->
+            <div class="today-uptime">
+              <span class="uptime-label">今日在线率</span>
+              <span class="uptime-value" :class="getTodayUptimeColor(monitor.daily_uptime)">
+                {{ getTodayUptime(monitor.daily_uptime) }}
+              </span>
             </div>
 
             <!-- 30天热力图 -->
@@ -108,15 +114,36 @@ const getTypeText = (type) => ({ http: 'HTTP', tcp: 'TCP', ping: 'PING' }[type] 
 const getStatusText = (status) => ({ up: '正常', down: '故障', unknown: '未知' }[status] || '未知')
 
 const getHeatColor = (uptime) => {
-  if (uptime === null || uptime === undefined) return 'no-data'
-  if (uptime >= 90) return 'excellent'
-  if (uptime >= 70) return 'warning'
+  if (uptime === null || uptime === undefined) return 'unknown'
+  if (uptime >= 99) return 'excellent'
+  if (uptime >= 95) return 'good'
+  if (uptime >= 90) return 'warning'
   return 'critical'
 }
 
 const getTooltip = (day) => {
   if (day.uptime === null) return `${day.date}: 无数据`
   return `${day.date}: ${day.uptime.toFixed(1)}% (${day.up_count}/${day.total_checks})`
+}
+
+// 获取今日在线率
+const getTodayUptime = (dailyUptime) => {
+  if (!dailyUptime || dailyUptime.length === 0) return '--'
+  // 获取最后一天（今天）的数据
+  const today = dailyUptime[dailyUptime.length - 1]
+  if (today.uptime === null || today.uptime === undefined) return '--'
+  return today.uptime.toFixed(2) + '%'
+}
+
+// 获取今日在线率颜色
+const getTodayUptimeColor = (dailyUptime) => {
+  if (!dailyUptime || dailyUptime.length === 0) return 'unknown'
+  const today = dailyUptime[dailyUptime.length - 1]
+  if (today.uptime === null || today.uptime === undefined) return 'unknown'
+  if (today.uptime >= 99) return 'excellent'
+  if (today.uptime >= 95) return 'good'
+  if (today.uptime >= 90) return 'warning'
+  return 'critical'
 }
 
 const loadStatusPage = async () => {
@@ -247,33 +274,82 @@ onMounted(loadStatusPage)
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
-.service-name {
+.service-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.service-status {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 1.125rem;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+/* 今日在线率 */
+.today-uptime {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: var(--md-surface);
+  border-radius: var(--md-shape-sm);
+}
+
+.uptime-label {
+  font-size: 0.875rem;
+  color: var(--md-on-surface-variant);
+}
+
+.uptime-value {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.uptime-value.excellent { color: var(--md-success); }
+.uptime-value.good { color: #4CAF50; }
+.uptime-value.warning { color: var(--md-warning); }
+.uptime-value.critical { color: var(--md-error); }
+.uptime-value.unknown { color: var(--md-outline); }
+
+.service-name {
+  font-size: 1rem;
   font-weight: 600;
   color: var(--md-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--md-outline);
+  flex-shrink: 0;
+  margin-left: 2px;
 }
 
-.status-dot.up { background: var(--md-success); box-shadow: 0 0 8px var(--md-success); }
-.status-dot.down { background: var(--md-error); box-shadow: 0 0 8px var(--md-error); }
+.status-dot.up { background: var(--md-success); box-shadow: 0 0 3px 1px var(--md-success); }
+.status-dot.down { background: var(--md-error); box-shadow: 0 0 3px 1px var(--md-error); }
 
 .service-type {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--md-on-surface-variant);
-  margin-left: 24px;
-  text-transform: uppercase;
+  padding: 2px 6px;
+  background: var(--md-surface-variant);
+  border-radius: 4px;
+  flex-shrink: 0;
 }
 
 .service-status {
@@ -283,16 +359,21 @@ onMounted(loadStatusPage)
 .status-text {
   font-weight: 600;
   font-size: 0.875rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .status-text.up { color: var(--md-success); }
 .status-text.down { color: var(--md-error); }
 
 .response-time {
-  display: block;
   font-size: 0.75rem;
   color: var(--md-on-surface-variant);
-  margin-top: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 2px 6px;
+  background: var(--md-surface-variant);
+  border-radius: 4px;
 }
 
 /* 热力图 */
@@ -316,8 +397,10 @@ onMounted(loadStatusPage)
 }
 
 .heat-cell.excellent { background: var(--md-success); }
+.heat-cell.good { background: #4CAF50; }
 .heat-cell.warning { background: var(--md-warning); }
 .heat-cell.critical { background: var(--md-error); }
+.heat-cell.unknown { background: var(--md-outline-variant); }
 
 /* 页脚 */
 .status-footer {
