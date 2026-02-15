@@ -52,6 +52,9 @@
 ### 安装步骤
 
 ```bash
+# 克隆仓库
+git clone https://github.com/LangfordKuo/Uptime.git
+cd Uptime
 # 安装后端依赖
 cd backend
 npm install
@@ -62,6 +65,8 @@ npm install
 ```
 
 ### 运行项目
+测试没有问题后不要忘记添加守护进程（宝塔里可以可视化操作，非常傻瓜）
+前端和后端需要同时运行。
 
 ```bash
 # 启动后端服务（端口 3000）
@@ -74,6 +79,7 @@ npm run dev
 ```
 
 访问 http://localhost:5173 开始使用
+可以在宝塔直接设置反向代理http://localhost:5173
 
 ### 首次安装
 
