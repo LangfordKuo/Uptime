@@ -55,6 +55,11 @@
         </div>
       </div>
     </div>
+    
+    <!-- 页脚 -->
+    <footer class="login-footer">
+      <p>Powered by <a href="https://github.com/LangfordKuo/Uptime" target="_blank" rel="noopener noreferrer">Uptime Monitor</a></p>
+    </footer>
   </div>
 </template>
 
@@ -89,8 +94,6 @@ const loadSiteSettings = async () => {
     if (res.data) {
       siteSettings.siteName = res.data.siteName || 'Uptime'
       siteSettings.siteDescription = res.data.siteDescription || '服务状态监控系统'
-      // 更新页面标题
-      document.title = siteSettings.siteName
     }
   } catch (error) {
     console.error('加载网站设置失败:', error)
@@ -242,5 +245,28 @@ const handleLogin = async () => {
   .form-section {
     padding: 32px;
   }
+}
+
+/* 页脚 */
+.login-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 16px;
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.login-footer a {
+  color: var(--md-on-surface-variant);
+  text-decoration: none;
+  border-bottom: 1px solid var(--md-outline-variant);
+  transition: border-color 0.2s;
+}
+
+.login-footer a:hover {
+  border-color: var(--md-primary);
 }
 </style>

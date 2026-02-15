@@ -76,7 +76,7 @@
 
       <!-- 页脚 -->
       <footer class="status-footer">
-        <p>Powered by Uptime Monitor</p>
+        <p>Powered by <a href="https://github.com/LangfordKuo/Uptime" target="_blank" rel="noopener noreferrer">Uptime Monitor</a></p>
       </footer>
     </div>
   </div>
@@ -162,7 +162,7 @@ const loadStatusPage = async () => {
     
     // 设置页面标题
     if (statusPage.value?.name) {
-      document.title = `${statusPage.value.name} - 状态页`
+      document.title = statusPage.value.name
     }
   } catch {
     ElMessage.error('加载失败')
@@ -417,5 +417,16 @@ onMounted(loadStatusPage)
   color: var(--md-on-surface-variant);
   margin-top: 32px;
   font-size: 0.875rem;
+}
+
+.status-footer a {
+  color: var(--md-on-surface-variant);
+  text-decoration: none;
+  border-bottom: 1px solid var(--md-outline-variant);
+  transition: border-color 0.2s;
+}
+
+.status-footer a:hover {
+  border-color: var(--md-primary);
 }
 </style>

@@ -83,6 +83,11 @@
       <div class="content-area">
         <router-view />
       </div>
+      
+      <!-- 页脚 -->
+      <footer class="layout-footer">
+        <p>Powered by <a href="https://github.com/LangfordKuo/Uptime" target="_blank" rel="noopener noreferrer">Uptime Monitor</a></p>
+      </footer>
     </main>
   </div>
 </template>
@@ -382,6 +387,26 @@ onUnmounted(() => {
   flex: 1;
   padding: 0 32px 32px;
   overflow-y: auto;
+}
+
+/* 页脚 */
+.layout-footer {
+  text-align: center;
+  padding: 16px;
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.layout-footer a {
+  color: var(--md-on-surface-variant);
+  text-decoration: none;
+  border-bottom: 1px solid var(--md-outline-variant);
+  transition: border-color 0.2s;
+}
+
+.layout-footer a:hover {
+  border-color: var(--md-primary);
 }
 
 /* 响应式 */

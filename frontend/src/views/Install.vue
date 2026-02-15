@@ -108,6 +108,11 @@
         </div>
       </el-card>
     </div>
+    
+    <!-- 页脚 -->
+    <footer class="install-footer">
+      <p>Powered by <a href="https://github.com/LangfordKuo/Uptime" target="_blank" rel="noopener noreferrer">Uptime Monitor</a></p>
+    </footer>
   </div>
 </template>
 
@@ -268,5 +273,25 @@ const goToLogin = () => {
 :deep(.el-result__subtitle strong) {
   color: #667eea;
   font-size: 18px;
+}
+
+/* 页脚 */
+.install-footer {
+  text-align: center;
+  padding: 16px;
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
+  margin-top: 32px;
+}
+
+.install-footer a {
+  color: var(--md-on-surface-variant);
+  text-decoration: none;
+  border-bottom: 1px solid var(--md-outline-variant);
+  transition: border-color 0.2s;
+}
+
+.install-footer a:hover {
+  border-color: var(--md-primary);
 }
 </style>

@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { installApi } from '@/api'
+import { installApi, settingsApi } from '@/api'
 
 // 安装状态缓存
 const INSTALL_CACHE_KEY = 'uptime_installed'
@@ -177,6 +177,16 @@ router.beforeEach(async (to, from, next) => {
     // 已登录用户访问登录页，跳转到首页
     next('/')
     return
+  }
+  
+  // 设置页面标题
+  try {
+    const res = await settingsApi.getSiteSettings()
+    if (res.data?.siteName) {
+      document.title = res.data.siteName
+    }
+  } catch (error) {
+    // 使用默认标题
   }
   
   next()

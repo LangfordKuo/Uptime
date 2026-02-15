@@ -299,8 +299,6 @@ const loadSettings = async () => {
     const res = await settingsApi.getSiteSettings()
     if (res.data) {
       Object.assign(siteForm, res.data)
-      // 更新页面标题
-      document.title = siteForm.siteName
     }
   } catch (error) {
     console.error('加载设置失败:', error)
@@ -435,9 +433,6 @@ const saveSiteSettings = async () => {
       siteUrl: siteForm.siteUrl,
       siteDescription: siteForm.siteDescription
     })
-    
-    // 更新页面标题
-    document.title = siteForm.siteName
     
     ElMessage.success('网站设置已保存')
   } catch (error) {
