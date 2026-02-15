@@ -16,6 +16,10 @@
           <el-icon><Edit /></el-icon>
           编辑
         </el-button>
+        <el-button type="danger" @click="handleDelete">
+          <el-icon><Delete /></el-icon>
+          删除
+        </el-button>
       </template>
     </el-page-header>
 
@@ -130,13 +134,15 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
 import { loadTimezoneSettings, formatWithSystemTimezone } from '@/utils/timezone'
 import { monitorApi } from '@/api'
+import { Refresh, Edit, Delete } from '@element-plus/icons-vue'
 
 const route = useRoute()
+const router = useRouter()
 
 const monitor = ref({})
 const stats = ref({})
@@ -175,6 +181,42 @@ const formatDuration = (seconds) => {
   const minutes = Math.floor((seconds % 3600) / 60)
   const secs = Math.floor(seconds % 60)
   return `${hours}时${minutes}分${secs}秒`
+}
+
+const handleDelete = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除监控项 "${monitor.value.name}" 吗？此操作不可恢复。`,
+      '确认删除',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const res = await monitorApi.delete(route.params.id)
+    if (res.success) {
+      ElMessage.success('删除成功')
+      router.push('/')
+    } else {
+      ElMessage.error(res.message || '删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除监控项失败:', error)
+      // 响应拦截器已经提取了 response.data，所以 error 可能是字符串或包含 message 的对象
+      let errorMsg = '删除失败'
+      if (typeof error === 'string') {
+        errorMsg = error
+      } else if (error?.message) {
+        errorMsg = error.message
+      } else if (error?.data?.message) {
+        errorMsg = error.data.message
+      }
+      ElMessage.error(errorMsg)
+    }
+  }
 }
 
 const initChart = () => {
