@@ -29,6 +29,17 @@ class SystemSettingController {
         data: settings
       });
     } catch (error) {
+      // 数据库未安装时返回默认值
+      if (error.message && error.message.includes('no such table')) {
+        return res.json({
+          success: true,
+          data: {
+            siteName: 'Uptime',
+            siteUrl: '',
+            siteDescription: '服务状态监控系统'
+          }
+        });
+      }
       console.error('Error getting site settings:', error);
       res.status(500).json({
         success: false,
@@ -115,6 +126,16 @@ class SystemSettingController {
         data: settings
       });
     } catch (error) {
+      // 数据库未安装时返回默认值
+      if (error.message && error.message.includes('no such table')) {
+        return res.json({
+          success: true,
+          data: {
+            timezone: 'UTC',
+            dateFormat: 'YYYY-MM-DD HH:mm:ss'
+          }
+        });
+      }
       console.error('Error getting timezone settings:', error);
       res.status(500).json({
         success: false,

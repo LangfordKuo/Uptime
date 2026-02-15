@@ -207,10 +207,12 @@ const goToLogin = () => {
 .install-page {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--md-background);
   padding: 20px;
+  position: relative;
 }
 
 .install-container {
@@ -277,11 +279,14 @@ const goToLogin = () => {
 
 /* 页脚 */
 .install-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   text-align: center;
   padding: 16px;
   color: var(--md-on-surface-variant);
   font-size: 0.875rem;
-  margin-top: 32px;
 }
 
 .install-footer a {
