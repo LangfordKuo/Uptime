@@ -189,8 +189,15 @@ const handleSubmit = async () => {
     
     const data = {
       ...formData.value,
-      config: formData.value.type === 'http' ? formData.value.config : null
+      config: formData.value.type === 'http' ? formData.value.config : undefined
     }
+    
+    // 删除 undefined 字段
+    Object.keys(data).forEach(key => {
+      if (data[key] === undefined) {
+        delete data[key]
+      }
+    })
 
     if (isEdit.value) {
       await monitorStore.updateMonitor(route.params.id, data)
