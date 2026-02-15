@@ -2,6 +2,8 @@
 > 云服务器推荐：https://lyew.com/
 
 一个类似 UptimeRobot 的服务监控系统，支持 HTTP/HTTPS、TCP 端口和 PING 监控，提供实时状态更新、可视化统计和公开状态页展示。
+<img width="2538" height="1285" alt="ScreenshotUptime" src="https://github.com/user-attachments/assets/5ba4a9ff-c255-40a4-a263-9e4cda63273d" />
+
 
 ## 功能特性
 
