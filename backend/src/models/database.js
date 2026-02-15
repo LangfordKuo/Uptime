@@ -158,6 +158,9 @@ export async function initializeDatabase() {
   
   console.log('Initializing database tables...');
   
+  // 标记数据库已初始化，允许保存
+  dbInitialized = true;
+  
   // 创建 monitors 表
   dbWrapper.exec(`
     CREATE TABLE IF NOT EXISTS monitors (
