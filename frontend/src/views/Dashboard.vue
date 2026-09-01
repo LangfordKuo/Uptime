@@ -1,74 +1,72 @@
 <template>
-  <div class="dashboard">
+  <div class="mx-auto max-w-7xl space-y-6">
     <!-- 统计卡片 -->
-    <div class="stats-grid">
-      <div class="stat-card" v-for="stat in statsList" :key="stat.key">
-        <div class="stat-icon" :style="{ backgroundColor: stat.bgColor }">
-          <el-icon :size="28" :color="stat.color">
-            <component :is="stat.icon" />
-          </el-icon>
-        </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ stat.value }}</div>
-          <div class="stat-label">{{ stat.label }}</div>
-        </div>
-      </div>
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <Card v-for="stat in statsList" :key="stat.key" class="gap-0 py-0">
+        <CardContent class="flex items-center gap-4 px-5 py-5">
+          <div :class="cn('flex size-11 shrink-0 items-center justify-center rounded-lg', stat.bgClass)">
+            <component :is="stat.icon" :class="cn('size-5', stat.fgClass)" />
+          </div>
+          <div>
+            <div class="text-2xl font-bold tabular-nums leading-none">{{ stat.value }}</div>
+            <div class="mt-1 text-xs text-muted-foreground">{{ stat.label }}</div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
 
     <!-- 监控列表 -->
-    <div class="monitors-section">
-      <div class="section-header">
-        <h2>服务监控</h2>
-        <div class="header-actions">
-          <el-select
+    <div class="space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-base font-semibold">服务监控</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <Select
             v-model="groupFilter"
-            clearable
+            :options="groupOptions"
             placeholder="全部分组"
-            size="default"
-            style="width: 150px"
-          >
-            <el-option v-for="g in monitorStore.allGroups" :key="g" :label="g" :value="g" />
-          </el-select>
-          <el-input
-            v-model="searchText"
-            clearable
-            placeholder="搜索名称/目标"
-            style="width: 180px"
-            :prefix-icon="Search"
+            class="w-36"
           />
-          <div class="filter-tabs">
-            <button
-              v-for="tab in filterTabs"
-              :key="tab.value"
-              class="tab-btn"
-              :class="{ 'active': currentFilter === tab.value }"
-              @click="currentFilter = tab.value"
-            >
-              {{ tab.label }}
-            </button>
+          <div class="relative">
+            <Search class="text-muted-foreground absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
+            <Input v-model="searchText" placeholder="搜索名称/目标" class="w-44 pl-8" />
           </div>
+          <Tabs v-model="currentFilter">
+            <TabsList>
+              <TabsTrigger v-for="tab in filterTabs" :key="tab.value" :value="tab.value" class="flex-none px-3">
+                {{ tab.label }}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </div>
 
-      <div class="toolbar" v-if="authStore.isAdmin || authStore.isUser">
-        <el-button size="small" @click="handleExport">
-          <el-icon><Download /></el-icon>&nbsp;导出
-        </el-button>
-        <el-upload
-          :show-file-list="false"
-          accept=".json"
-          :before-upload="handleImportFile"
-        >
-          <el-button size="small">
-            <el-icon><Upload /></el-icon>&nbsp;导入
-          </el-button>
-        </el-upload>
-        <el-button size="small" @click="$router.push('/monitors/create')" type="primary">
-          <el-icon><Plus /></el-icon>&nbsp;新建监控
-        </el-button>
+      <div class="flex flex-wrap gap-2" v-if="authStore.isAdmin || authStore.isUser">
+        <Button variant="outline" size="sm" @click="handleExport">
+          <Download />
+          导出
+        </Button>
+        <label>
+          <input
+            ref="importInput"
+            type="file"
+            accept=".json"
+            class="hidden"
+            @change="handleImportFile"
+          />
+          <Button variant="outline" size="sm" as-child>
+            <span>
+              <Upload />
+              导入
+            </span>
+          </Button>
+        </label>
+        <Button size="sm" @click="$router.push('/monitors/create')">
+          <Plus />
+          新建监控
+        </Button>
       </div>
 
-      <div class="monitors-grid">
+      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" v-if="filteredMonitors.length > 0">
         <MonitorCard
           v-for="monitor in filteredMonitors"
           :key="monitor.id"
@@ -77,15 +75,15 @@
         />
       </div>
 
-      <el-empty
-        v-if="filteredMonitors.length === 0"
-        :description="monitors.length === 0 ? '暂无监控项' : '没有匹配的监控项'"
-        :image-size="120"
+      <Empty
+        v-else
+        :description="monitors.length === 0 ? '暂无监控项，创建第一个监控开始使用' : '没有匹配的监控项'"
       >
-        <el-button v-if="monitors.length === 0" type="primary" @click="$router.push('/monitors/create')">
+        <Button v-if="monitors.length === 0" size="sm" @click="$router.push('/monitors/create')">
+          <Plus />
           创建第一个监控
-        </el-button>
-      </el-empty>
+        </Button>
+      </Empty>
     </div>
   </div>
 </template>
@@ -94,11 +92,23 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { ElMessage } from 'element-plus'
-import { Search, Download, Upload, Plus } from '@element-plus/icons-vue'
+import {
+  Search, Download, Upload, Plus, Activity,
+  CircleCheck, CircleX, AlertTriangle
+} from 'lucide-vue-next'
+import { cn } from '@/lib/utils'
+import { toast } from '@/composables/useToast'
 import { useMonitorStore } from '@/stores/monitor'
 import { useAuthStore } from '@/stores/auth'
 import { monitorApi } from '@/api'
+import Card, { CardContent } from '@/components/ui/card.js'
+import Button from '@/components/ui/Button.vue'
+import Input from '@/components/ui/Input.vue'
+import Select from '@/components/ui/Select.vue'
+import Empty from '@/components/ui/Empty.vue'
+import Tabs from '@/components/ui/Tabs.vue'
+import TabsList from '@/components/ui/TabsList.vue'
+import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import MonitorCard from '@/components/MonitorCard.vue'
 
 const router = useRouter()
@@ -110,39 +120,24 @@ const { fetchDashboard } = monitorStore
 const currentFilter = ref('all')
 const groupFilter = ref('')
 const searchText = ref('')
+const importInput = ref(null)
 
 const statsList = computed(() => [
   {
-    key: 'total',
-    label: '总监控项',
-    value: dashboardStats.value.total || 0,
-    icon: 'Monitor',
-    color: '#6750A4',
-    bgColor: '#EADDFF'
+    key: 'total', label: '总监控项', value: dashboardStats.value.total || 0,
+    icon: Activity, bgClass: 'bg-primary/10', fgClass: 'text-primary'
   },
   {
-    key: 'up',
-    label: '运行正常',
-    value: dashboardStats.value.up || 0,
-    icon: 'CircleCheck',
-    color: '#2E7D32',
-    bgColor: '#E8F5E9'
+    key: 'up', label: '运行正常', value: dashboardStats.value.up || 0,
+    icon: CircleCheck, bgClass: 'bg-success/10', fgClass: 'text-success'
   },
   {
-    key: 'down',
-    label: '异常故障',
-    value: dashboardStats.value.down || 0,
-    icon: 'CircleClose',
-    color: '#B3261E',
-    bgColor: '#F9DEDC'
+    key: 'down', label: '异常故障', value: dashboardStats.value.down || 0,
+    icon: CircleX, bgClass: 'bg-destructive/10', fgClass: 'text-destructive'
   },
   {
-    key: 'incidents',
-    label: '活动故障',
-    value: dashboardStats.value.activeIncidents || 0,
-    icon: 'Warning',
-    color: '#ED6C02',
-    bgColor: '#FFF3E0'
+    key: 'incidents', label: '活动故障', value: dashboardStats.value.activeIncidents || 0,
+    icon: AlertTriangle, bgClass: 'bg-warning/15', fgClass: 'text-warning'
   }
 ])
 
@@ -152,6 +147,10 @@ const filterTabs = [
   { label: '故障', value: 'down' },
   { label: '未知', value: 'unknown' }
 ]
+
+const groupOptions = computed(() =>
+  monitorStore.allGroups.map(g => ({ label: g, value: g }))
+)
 
 const filteredMonitors = computed(() => {
   let list = monitors.value
@@ -187,184 +186,36 @@ const handleExport = async () => {
     a.download = `uptime-monitors-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
-    ElMessage.success('导出成功')
+    toast.success('导出成功')
   } catch {
-    ElMessage.error('导出失败')
+    toast.error('导出失败')
   }
 }
 
-const handleImportFile = async (file) => {
+const handleImportFile = async (e) => {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
   try {
     const text = await file.text()
     const parsed = JSON.parse(text)
-    const monitors = Array.isArray(parsed) ? parsed : parsed.monitors
-    if (!Array.isArray(monitors) || monitors.length === 0) {
-      ElMessage.error('文件中没有监控项')
-      return false
+    const list = Array.isArray(parsed) ? parsed : parsed.monitors
+    if (!Array.isArray(list) || list.length === 0) {
+      toast.error('文件中没有监控项')
+      return
     }
-    const res = await monitorApi.importMonitors(monitors)
+    const res = await monitorApi.importMonitors(list)
     if (res.success) {
       const { created, failed } = res.data
-      ElMessage.success(`导入完成: 成功 ${created} 个${failed ? `，失败 ${failed} 个` : ''}`)
+      toast.success(`导入完成: 成功 ${created} 个${failed ? `，失败 ${failed} 个` : ''}`)
       fetchDashboard()
     }
-  } catch (e) {
-    ElMessage.error('导入失败: ' + (e?.response?.data?.message || '文件格式错误'))
+  } catch (err) {
+    toast.error('导入失败: ' + (err?.response?.data?.message || '文件格式错误'))
   }
-  return false // 阻止 el-upload 默认上传
 }
 
 onMounted(() => {
   fetchDashboard()
 })
 </script>
-
-<style scoped>
-.dashboard {
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-/* 统计卡片 */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
-  margin-bottom: 32px;
-}
-
-.stat-card {
-  background: var(--md-surface);
-  border-radius: var(--md-shape-lg);
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  box-shadow: var(--md-elevation-1);
-  transition: box-shadow 0.2s;
-}
-
-.stat-card:hover {
-  box-shadow: var(--md-elevation-2);
-}
-
-.stat-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--md-shape-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.stat-content {
-  flex: 1;
-}
-
-.stat-value {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--md-on-surface);
-  line-height: 1;
-}
-
-.stat-label {
-  font-size: 0.875rem;
-  color: var(--md-on-surface-variant);
-  margin-top: 4px;
-}
-
-/* 监控列表 */
-.monitors-section {
-  background: var(--md-surface);
-  border-radius: var(--md-shape-lg);
-  padding: 24px;
-  box-shadow: var(--md-elevation-1);
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-.section-header h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--md-on-surface);
-  margin: 0;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.toolbar {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.filter-tabs {
-  display: flex;
-  gap: 4px;
-  background: var(--md-surface-variant);
-  padding: 4px;
-  border-radius: var(--md-shape-full);
-  border: 1px solid var(--md-outline-variant);
-}
-
-.tab-btn {
-  padding: 8px 20px;
-  border: none;
-  background: transparent;
-  color: var(--md-on-surface-variant);
-  font-size: 0.875rem;
-  font-weight: 500;
-  border-radius: var(--md-shape-full);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.tab-btn:hover {
-  color: var(--md-on-surface);
-  background: rgba(103, 80, 164, 0.05);
-}
-
-.tab-btn.active {
-  background: var(--md-primary);
-  color: var(--md-on-primary);
-  box-shadow: none;
-}
-
-.monitors-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
-}
-
-/* 响应式 */
-@media (max-width: 1200px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 768px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .section-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-}
-</style>

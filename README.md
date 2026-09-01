@@ -59,7 +59,9 @@
 ### 前端
 - **Vue 3** - 前端框架（Composition API）
 - **Vite** - 构建工具
-- **Element Plus** - UI 组件库
+- **Tailwind CSS v4** - 原子化样式
+- **shadcn/ui 设计体系** - 参照 [shadcn-ui/ui](https://github.com/shadcn-ui/ui) 的设计令牌与组件风格（Vue 实现），支持亮/暗/跟随系统主题与强调色切换
+- **lucide-icons** - 图标库
 - **Pinia** - 状态管理
 - **Vue Router** - 路由管理
 - **ECharts** - 数据可视化

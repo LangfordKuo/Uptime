@@ -93,13 +93,16 @@ class MonitorController {
   // 获取单个监控项
   getMonitorById = async (req, res) => {
     try {
-      const monitor = MonitorModel.getById(req.params.id);
+      const monitor = MonitorModel.getByIdWithLatest(req.params.id);
 
       if (!monitor || !this.canAccess(monitor, req.user)) {
         return fail(res, 404, 'Monitor not found');
       }
 
-      res.json({ success: true, data: this.decorate(monitor) });
+      const data = this.decorate(monitor);
+      data.uptime24h = StatisticsService.getUptime24hMap()[monitor.id] ?? null;
+
+      res.json({ success: true, data });
     } catch (error) {
       console.error('Error getting monitor:', error);
       fail(res, 500, 'Failed to get monitor');

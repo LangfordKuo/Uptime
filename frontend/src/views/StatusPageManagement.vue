@@ -1,167 +1,180 @@
 <template>
-  <div class="status-page-management">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>状态页管理</span>
-          <el-button type="primary" @click="showCreateDialog = true">
-            <el-icon><Plus /></el-icon>
+  <div class="mx-auto max-w-5xl space-y-6">
+    <Card>
+      <CardHeader>
+        <div class="flex w-full flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle>状态页列表</CardTitle>
+            <CardDescription>创建可公开访问的服务状态页面</CardDescription>
+          </div>
+          <Button size="sm" @click="openCreate">
+            <Plus />
             新建状态页
-          </el-button>
+          </Button>
         </div>
-      </template>
+      </CardHeader>
+      <CardContent class="px-0 pb-0">
+        <div v-if="loading" class="flex justify-center py-16">
+          <Loader2 class="size-7 animate-spin text-muted-foreground" />
+        </div>
+        <Table v-else-if="statusPages.length > 0">
+          <TableHeader>
+            <TableRow>
+              <TableHead class="pl-6">名称</TableHead>
+              <TableHead>访问链接</TableHead>
+              <TableHead>描述</TableHead>
+              <TableHead>监控项</TableHead>
+              <TableHead>创建时间</TableHead>
+              <TableHead class="pr-6 text-right">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="row in statusPages" :key="row.id">
+              <TableCell class="pl-6">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium">{{ row.name }}</span>
+                  <Badge v-if="row.is_public" variant="success">公开</Badge>
+                  <Badge v-else variant="secondary">私有</Badge>
+                  <Badge v-if="row.has_password" variant="warning">密码</Badge>
+                </div>
+              </TableCell>
+              <TableCell>
+                <a
+                  :href="`/status/${row.slug}`"
+                  target="_blank"
+                  class="text-primary hover:underline underline-offset-2 font-mono text-xs"
+                >/status/{{ row.slug }}</a>
+              </TableCell>
+              <TableCell class="max-w-48 truncate text-muted-foreground" :title="row.description">
+                {{ row.description || '-' }}
+              </TableCell>
+              <TableCell>{{ row.monitor_count }}</TableCell>
+              <TableCell class="text-muted-foreground">{{ formatTime(row.created_at) }}</TableCell>
+              <TableCell class="pr-6">
+                <div class="flex justify-end gap-1">
+                  <Button variant="ghost" size="icon-sm" title="查看" @click="viewStatusPage(row)">
+                    <ExternalLink />
+                  </Button>
+                  <Button variant="ghost" size="icon-sm" title="编辑" @click="editStatusPage(row)">
+                    <Pencil />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    title="删除"
+                    class="text-destructive hover:text-destructive"
+                    @click="handleDelete(row)"
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <CardContent v-else>
+          <Empty description="暂无状态页，创建一个向访客展示服务状态" />
+        </CardContent>
+      </CardContent>
+    </Card>
 
-      <el-table :data="statusPages" v-loading="loading" stripe>
-        <el-table-column prop="name" label="名称" min-width="150">
-          <template #default="{ row }">
-            <div class="status-page-name">
-              <span>{{ row.name }}</span>
-              <el-tag v-if="row.is_public" type="success" size="small">公开</el-tag>
-              <el-tag v-else type="info" size="small">私有</el-tag>
-              <el-tag v-if="row.has_password" type="warning" size="small">密码保护</el-tag>
+    <!-- 创建/编辑状态页 -->
+    <Dialog :open="showDialog" @update:open="showDialog = $event" class="sm:max-w-lg">
+      <DialogHeader>
+        <DialogTitle>{{ isEditing ? '编辑状态页' : '新建状态页' }}</DialogTitle>
+        <DialogDescription>配置状态页信息与展示的监控项</DialogDescription>
+      </DialogHeader>
+      <div class="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="space-y-2">
+            <Label>名称</Label>
+            <Input v-model="form.name" placeholder="请输入状态页名称" />
+          </div>
+          <div class="space-y-2">
+            <Label>Slug</Label>
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-muted-foreground whitespace-nowrap">/status/</span>
+              <Input v-model="form.slug" placeholder="小写字母、数字、连字符" class="font-mono" />
             </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="slug" label="访问链接" min-width="200">
-          <template #default="{ row }">
-            <el-link type="primary" :href="`/status/${row.slug}`" target="_blank">
-              /status/{{ row.slug }}
-            </el-link>
-          </template>
-        </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="monitor_count" label="监控项数" width="100" />
-        <el-table-column prop="creator_name" label="创建者" width="120" />
-        <el-table-column prop="created_at" label="创建时间" width="180">
-          <template #default="{ row }">
-            {{ formatDate(row.created_at) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" @click="viewStatusPage(row)">
-              <el-icon><View /></el-icon>
-            </el-button>
-            <el-button size="small" type="primary" @click="editStatusPage(row)">
-              <el-icon><Edit /></el-icon>
-            </el-button>
-            <el-button size="small" type="danger" @click="deleteStatusPage(row)">
-              <el-icon><Delete /></el-icon>
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- 创建/编辑状态页对话框 -->
-    <el-dialog
-      v-model="showDialog"
-      :title="isEditing ? '编辑状态页' : '新建状态页'"
-      width="600px"
-    >
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="100px"
-      >
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入状态页名称" />
-        </el-form-item>
-
-        <el-form-item label="Slug" prop="slug">
-          <el-input v-model="form.slug" placeholder="只能包含小写字母、数字和连字符">
-            <template #prepend>/status/</template>
-          </el-input>
-        </el-form-item>
-
-        <el-form-item label="描述" prop="description">
-          <el-input
-            v-model="form.description"
-            type="textarea"
-            rows="3"
-            placeholder="请输入状态页描述"
-          />
-        </el-form-item>
-
-        <el-form-item label="Logo URL" prop="logo_url">
-          <el-input v-model="form.logo_url" placeholder="可选，状态页Logo地址" />
-        </el-form-item>
-
-        <el-form-item label="访问密码" prop="password">
-          <el-input
+          </div>
+        </div>
+        <div class="space-y-2">
+          <Label>描述</Label>
+          <Textarea v-model="form.description" :rows="2" placeholder="请输入状态页描述（可选）" />
+        </div>
+        <div class="space-y-2">
+          <Label>Logo URL</Label>
+          <Input v-model="form.logo_url" placeholder="可选，状态页 Logo 地址" />
+        </div>
+        <div class="space-y-2">
+          <Label>访问密码</Label>
+          <Input
             v-model="form.password"
             type="password"
-            show-password
             :placeholder="isEditing && form.has_password ? '已设置密码，留空保持不变' : '可选，设置后访客需输入密码'"
           />
-          <el-checkbox v-if="isEditing && form.has_password" v-model="form.remove_password" style="width: 100%">
+          <label v-if="isEditing && form.has_password" class="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+            <Checkbox v-model="form.remove_password" />
             移除访问密码
-          </el-checkbox>
-        </el-form-item>
-
-        <el-form-item label="公开访问" prop="is_public">
-          <el-switch v-model="form.is_public" />
-        </el-form-item>
-
-        <el-form-item label="选择监控项" prop="monitor_ids">
-          <el-select
+          </label>
+        </div>
+        <label class="flex cursor-pointer items-center gap-3">
+          <Switch v-model="form.isPublicBool" />
+          <span class="text-sm font-medium">公开访问</span>
+        </label>
+        <div class="space-y-2">
+          <Label>展示的监控项</Label>
+          <MultiSelect
             v-model="form.monitor_ids"
-            multiple
-            filterable
+            :options="monitorOptions"
             placeholder="选择要展示的监控项"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="monitor in monitors"
-              :key="monitor.id"
-              :label="monitor.name"
-              :value="monitor.id"
-            />
-          </el-select>
-        </el-form-item>
-      </el-form>
-
-      <template #footer>
-        <el-button @click="showDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">
+            empty-text="暂无监控项"
+          />
+        </div>
+      </div>
+      <DialogFooter class="mt-2">
+        <Button variant="outline" @click="showDialog = false">取消</Button>
+        <Button :loading="submitting" @click="handleSubmit">
           {{ isEditing ? '保存' : '创建' }}
-        </el-button>
-      </template>
-    </el-dialog>
+        </Button>
+      </DialogFooter>
+    </Dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { Plus, Loader2, ExternalLink, Pencil, Trash2 } from 'lucide-vue-next'
+import { toast } from '@/composables/useToast'
+import { confirm } from '@/composables/useConfirm'
 import { statusPageApi, monitorApi } from '@/api'
 import { formatTime } from '@/utils/datetime'
-
-const router = useRouter()
+import Card, { CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card.js'
+import Button from '@/components/ui/Button.vue'
+import Input from '@/components/ui/Input.vue'
+import Textarea from '@/components/ui/Textarea.vue'
+import Label from '@/components/ui/Label.vue'
+import Switch from '@/components/ui/Switch.vue'
+import Checkbox from '@/components/ui/Checkbox.vue'
+import MultiSelect from '@/components/ui/MultiSelect.vue'
+import Badge from '@/components/ui/badge.js'
+import Empty from '@/components/ui/Empty.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DialogFooter from '@/components/ui/DialogFooter.vue'
+import Table, { TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table.js'
 
 const statusPages = ref([])
 const monitors = ref([])
 const loading = ref(false)
 const showDialog = ref(false)
-const showCreateDialog = computed({
-  get: () => showDialog.value && !isEditing.value,
-  set: (val) => {
-    if (!val) showDialog.value = false
-    else {
-      isEditing.value = false
-      resetForm()
-      showDialog.value = true
-    }
-  }
-})
 const isEditing = ref(false)
 const submitting = ref(false)
-const formRef = ref(null)
+const editingId = ref(null)
 
 const form = reactive({
-  id: null,
   name: '',
   slug: '',
   description: '',
@@ -169,36 +182,20 @@ const form = reactive({
   password: '',
   has_password: false,
   remove_password: false,
-  is_public: true,
+  isPublicBool: true,
   monitor_ids: []
 })
 
-const rules = {
-  name: [
-    { required: true, message: '请输入状态页名称', trigger: 'blur' },
-    { min: 1, max: 100, message: '长度在1-100个字符', trigger: 'blur' }
-  ],
-  slug: [
-    { required: true, message: '请输入Slug', trigger: 'blur' },
-    { pattern: /^[a-z0-9-]+$/, message: '只能包含小写字母、数字和连字符', trigger: 'blur' }
-  ]
-}
-
-const formatDate = (dateStr) => {
-  return formatTime(dateStr)
-}
+const monitorOptions = computed(() =>
+  monitors.value.map(m => ({ label: m.name, value: m.id }))
+)
 
 const resetForm = () => {
-  form.id = null
-  form.name = ''
-  form.slug = ''
-  form.description = ''
-  form.logo_url = ''
-  form.password = ''
-  form.has_password = false
-  form.remove_password = false
-  form.is_public = true
-  form.monitor_ids = []
+  Object.assign(form, {
+    name: '', slug: '', description: '', logo_url: '',
+    password: '', has_password: false, remove_password: false,
+    isPublicBool: true, monitor_ids: []
+  })
 }
 
 const loadStatusPages = async () => {
@@ -206,8 +203,8 @@ const loadStatusPages = async () => {
     loading.value = true
     const res = await statusPageApi.getAll()
     statusPages.value = res.data
-  } catch (error) {
-    ElMessage.error('加载状态页列表失败')
+  } catch {
+    toast.error('加载状态页列表失败')
   } finally {
     loading.value = false
   }
@@ -217,13 +214,18 @@ const loadMonitors = async () => {
   try {
     const res = await monitorApi.getAll()
     monitors.value = res.data
-  } catch (error) {
-    console.error('加载监控项失败:', error)
-  }
+  } catch { /* ignore */ }
 }
 
 const viewStatusPage = (row) => {
   window.open(`/status/${row.slug}`, '_blank')
+}
+
+const openCreate = () => {
+  isEditing.value = false
+  editingId.value = null
+  resetForm()
+  showDialog.value = true
 }
 
 const editStatusPage = async (row) => {
@@ -231,86 +233,71 @@ const editStatusPage = async (row) => {
   try {
     const res = await statusPageApi.getById(row.id)
     const data = res.data
-    
-    form.id = data.id
-    form.name = data.name
-    form.slug = data.slug
-    form.description = data.description || ''
-    form.logo_url = data.logo_url || ''
-    form.password = ''
-    form.has_password = !!data.has_password
-    form.remove_password = false
-    form.is_public = data.is_public === 1
-    form.monitor_ids = data.monitors ? data.monitors.map(m => m.id) : []
-    
+    editingId.value = data.id
+    Object.assign(form, {
+      name: data.name,
+      slug: data.slug,
+      description: data.description || '',
+      logo_url: data.logo_url || '',
+      password: '',
+      has_password: !!data.has_password,
+      remove_password: false,
+      isPublicBool: data.is_public === 1,
+      monitor_ids: data.monitors ? data.monitors.map(m => m.id) : []
+    })
     showDialog.value = true
-  } catch (error) {
-    ElMessage.error('加载状态页详情失败')
+  } catch {
+    toast.error('加载状态页详情失败')
   }
 }
 
 const handleSubmit = async () => {
-  try {
-    await formRef.value.validate()
-    submitting.value = true
+  if (!form.name.trim()) return toast.error('请输入状态页名称')
+  if (!/^[a-z0-9-]+$/.test(form.slug)) return toast.error('Slug 只能包含小写字母、数字和连字符')
 
+  submitting.value = true
+  try {
     const data = {
-      name: form.name,
+      name: form.name.trim(),
       slug: form.slug,
       description: form.description,
       logo_url: form.logo_url,
-      is_public: form.is_public,
+      is_public: form.isPublicBool,
       monitor_ids: form.monitor_ids
     }
-
-    // 密码处理：勾选移除→清空；填写了新密码→修改；否则不动
-    if (form.remove_password) {
-      data.password = ''
-    } else if (form.password) {
-      data.password = form.password
-    }
+    if (form.remove_password) data.password = ''
+    else if (form.password) data.password = form.password
 
     if (isEditing.value) {
-      await statusPageApi.update(form.id, data)
-      ElMessage.success('状态页更新成功')
+      await statusPageApi.update(editingId.value, data)
+      toast.success('状态页更新成功')
     } else {
       await statusPageApi.create(data)
-      ElMessage.success('状态页创建成功')
+      toast.success('状态页创建成功')
     }
-
     showDialog.value = false
-    resetForm()
     await loadStatusPages()
   } catch (error) {
-    if (error.response?.data?.message) {
-      ElMessage.error(error.response.data.message)
-    } else if (error !== false) {
-      ElMessage.error(isEditing.value ? '更新失败' : '创建失败')
-    }
+    toast.error(error?.response?.data?.message || (isEditing.value ? '更新失败' : '创建失败'))
   } finally {
     submitting.value = false
   }
 }
 
-const deleteStatusPage = async (row) => {
+const handleDelete = async (row) => {
+  const ok = await confirm({
+    title: '删除状态页',
+    description: `确定要删除状态页「${row.name}」吗？此操作不可恢复。`,
+    confirmText: '删除',
+    destructive: true
+  })
+  if (!ok) return
   try {
-    await ElMessageBox.confirm(
-      `确定要删除状态页 "${row.name}" 吗？此操作不可恢复。`,
-      '删除确认',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-
     await statusPageApi.delete(row.id)
-    ElMessage.success('删除成功')
+    toast.success('删除成功')
     await loadStatusPages()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-    }
+  } catch {
+    toast.error('删除失败')
   }
 }
 
@@ -319,127 +306,3 @@ onMounted(() => {
   loadMonitors()
 })
 </script>
-
-<style scoped>
-.status-page-management {
-  padding: 0;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 4px;
-}
-
-.card-header span {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--md-on-surface);
-}
-
-.status-page-name {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 表格样式优化 */
-:deep(.el-table) {
-  border-radius: var(--md-shape-lg);
-  overflow: hidden;
-  background-color: var(--md-surface);
-}
-
-:deep(.el-table th) {
-  background-color: var(--md-surface-variant) !important;
-  color: var(--md-on-surface-variant) !important;
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.5px;
-  padding: 16px 12px !important;
-}
-
-:deep(.el-table td) {
-  color: var(--md-on-surface) !important;
-  padding: 16px 12px !important;
-}
-
-:deep(.el-table__row:hover > td) {
-  background-color: var(--md-surface-variant) !important;
-}
-
-/* 标签样式 */
-:deep(.el-tag--success) {
-  background-color: #E8F5E9 !important;
-  color: #2E7D32 !important;
-  border-color: transparent !important;
-}
-
-:deep(.el-tag--info) {
-  background-color: #F5F5F5 !important;
-  color: #6B6B6B !important;
-  border-color: transparent !important;
-}
-
-/* 按钮样式 */
-:deep(.el-button--primary) {
-  background-color: var(--md-primary) !important;
-  border-color: var(--md-primary) !important;
-}
-
-:deep(.el-button--primary:hover) {
-  background-color: #333333 !important;
-  border-color: #333333 !important;
-}
-
-:deep(.el-button--danger) {
-  background-color: var(--md-error) !important;
-  border-color: var(--md-error) !important;
-}
-
-/* 链接样式 */
-:deep(.el-link--primary) {
-  color: var(--md-primary) !important;
-}
-
-:deep(.el-link--primary:hover) {
-  color: #333333 !important;
-}
-
-/* 对话框样式 */
-:deep(.el-dialog) {
-  border-radius: var(--md-shape-xl) !important;
-}
-
-:deep(.el-dialog__header) {
-  padding: 24px 24px 16px !important;
-  font-weight: 600;
-  font-size: 1.25rem;
-}
-
-:deep(.el-dialog__body) {
-  padding: 16px 24px !important;
-}
-
-:deep(.el-dialog__footer) {
-  padding: 16px 24px 24px !important;
-}
-
-/* 表单样式 */
-:deep(.el-form-item__label) {
-  color: var(--md-on-surface-variant) !important;
-  font-weight: 500;
-}
-
-:deep(.el-input__wrapper) {
-  background-color: var(--md-surface-variant) !important;
-  border-color: var(--md-outline-variant) !important;
-}
-
-:deep(.el-textarea__inner) {
-  background-color: var(--md-surface-variant) !important;
-  border-color: var(--md-outline-variant) !important;
-}
-</style>

@@ -78,6 +78,9 @@ class StatisticsService {
         `).all(monitorId, hours, monitorId, hours, this.rawRetentionHours);
 
     const result = rows[0];
+    if (hours <= this.rawRetentionHours) {
+      return result?.avg_response_time ? Math.round(result.avg_response_time) : 0;
+    }
     if (!result || !result.cnt) return 0;
     return Math.round(result.sum_response / result.cnt);
   }

@@ -1,93 +1,101 @@
 <template>
-  <div class="login-page">
-    <div class="login-container">
-      <div class="brand-section">
-        <div class="logo">
-          <el-icon :size="64" color="var(--md-primary)"><Monitor /></el-icon>
+  <div class="relative flex min-h-screen items-center justify-center bg-background p-4">
+    <Button
+      variant="ghost"
+      size="icon"
+      class="absolute right-4 top-4"
+      :title="theme.isDark() ? '切换亮色' : '切换暗色'"
+      @click="theme.toggleDark()"
+    >
+      <Sun v-if="theme.isDark()" class="size-4" />
+      <Moon v-else class="size-4" />
+    </Button>
+
+    <div class="w-full max-w-sm">
+      <!-- 品牌区 -->
+      <div class="mb-8 flex flex-col items-center gap-2 text-center">
+        <div class="bg-primary text-primary-foreground flex size-12 items-center justify-center rounded-xl">
+          <Activity class="size-6" />
         </div>
-        <h1>{{ siteSettings.siteName }}</h1>
-        <p>{{ siteSettings.siteDescription }}</p>
+        <h1 class="text-2xl font-bold tracking-tight">{{ siteSettings.siteName }}</h1>
+        <p class="text-sm text-muted-foreground">{{ siteSettings.siteDescription }}</p>
       </div>
 
-      <div class="form-section">
-        <div class="form-card">
-          <h2>欢迎回来</h2>
-          <p class="subtitle">请登录您的账户</p>
-
-          <el-form
-            ref="formRef"
-            :model="form"
-            :rules="rules"
-            class="login-form"
-          >
-            <el-form-item prop="username">
-              <el-input
-                v-model="form.username"
-                placeholder="用户名"
-                size="large"
-                :prefix-icon="User"
-                @keyup.enter="handleLogin"
-              />
-            </el-form-item>
-
-            <el-form-item prop="password">
-              <el-input
+      <!-- 登录卡片 -->
+      <Card>
+        <CardHeader>
+          <CardTitle class="text-xl">欢迎回来</CardTitle>
+          <CardDescription>请登录您的账户</CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-4">
+          <div class="space-y-2">
+            <Label for="username">用户名</Label>
+            <Input id="username" v-model="form.username" placeholder="请输入用户名" @keyup.enter="handleLogin" />
+          </div>
+          <div class="space-y-2">
+            <Label for="password">密码</Label>
+            <div class="relative">
+              <Input
+                id="password"
                 v-model="form.password"
-                type="password"
-                placeholder="密码"
-                size="large"
-                :prefix-icon="Lock"
-                show-password
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="请输入密码"
+                class="pr-10"
                 @keyup.enter="handleLogin"
               />
-            </el-form-item>
-
-            <el-button
-              type="primary"
-              size="large"
-              class="login-btn"
-              :loading="loading"
-              @click="handleLogin"
-            >
-              登录
-            </el-button>
-          </el-form>
-        </div>
-      </div>
+              <button
+                type="button"
+                class="text-muted-foreground hover:text-foreground absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+                @click="showPassword = !showPassword"
+              >
+                <EyeOff v-if="showPassword" class="size-4" />
+                <Eye v-else class="size-4" />
+              </button>
+            </div>
+          </div>
+          <Button class="w-full" :loading="loading" @click="handleLogin">登 录</Button>
+        </CardContent>
+      </Card>
     </div>
-    
-    <!-- 页脚 -->
-    <footer class="login-footer">
-      <p>Powered by <a href="https://github.com/LangfordKuo/Uptime" target="_blank" rel="noopener noreferrer">Uptime Monitor</a></p>
+
+    <footer class="absolute bottom-4 w-full text-center text-xs text-muted-foreground">
+      Powered by
+      <a
+        href="https://github.com/LangfordKuo/Uptime"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="hover:text-foreground hover:underline underline-offset-2"
+      >Uptime Monitor</a>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
+import { Activity, Eye, EyeOff } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
+import { useTheme } from '@/composables/useTheme'
+import { toast } from '@/composables/useToast'
 import { settingsApi } from '@/api'
+import Card, { CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card.js'
+import Button from '@/components/ui/Button.vue'
+import Input from '@/components/ui/Input.vue'
+import Label from '@/components/ui/Label.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const theme = useTheme()
 
-const formRef = ref(null)
 const loading = ref(false)
-
-const form = reactive({
-  username: '',
-  password: ''
-})
+const showPassword = ref(false)
+const form = reactive({ username: '', password: '' })
 
 const siteSettings = reactive({
   siteName: 'Uptime',
   siteDescription: '服务状态监控系统'
 })
 
-// 加载网站设置
 const loadSiteSettings = async () => {
   try {
     const res = await settingsApi.getSiteSettings()
@@ -100,173 +108,22 @@ const loadSiteSettings = async () => {
   }
 }
 
-onMounted(() => {
-  loadSiteSettings()
-})
-
-const rules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' }
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' }
-  ]
-}
-
 const handleLogin = async () => {
+  if (!form.username.trim() || !form.password) {
+    toast.error('请输入用户名和密码')
+    return
+  }
+  loading.value = true
   try {
-    await formRef.value.validate()
-    loading.value = true
-    
     await authStore.login(form)
-    ElMessage.success('登录成功')
+    toast.success('登录成功')
     router.push('/')
   } catch (error) {
-    if (error.response?.data?.message) {
-      ElMessage.error(error.response.data.message)
-    } else if (error !== false) {
-      ElMessage.error('登录失败')
-    }
+    toast.error(error?.response?.data?.message || '登录失败')
   } finally {
     loading.value = false
   }
 }
+
+onMounted(loadSiteSettings)
 </script>
-
-<style scoped>
-.login-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #F5F5F5;
-  padding: 20px;
-}
-
-.login-container {
-  display: flex;
-  width: 100%;
-  max-width: 960px;
-  min-height: 600px;
-  background: var(--md-surface);
-  border-radius: var(--md-shape-xl);
-  overflow: hidden;
-  box-shadow: var(--md-elevation-4);
-}
-
-.brand-section {
-  flex: 1;
-  background: var(--md-primary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px;
-  color: white;
-  text-align: center;
-}
-
-.logo {
-  width: 120px;
-  height: 120px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: var(--md-shape-lg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 32px;
-  backdrop-filter: blur(10px);
-}
-
-.brand-section h1 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin: 0 0 16px 0;
-}
-
-.brand-section p {
-  font-size: 1.125rem;
-  opacity: 0.9;
-  margin: 0;
-}
-
-.form-section {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 48px;
-}
-
-.form-card {
-  width: 100%;
-  max-width: 360px;
-}
-
-.form-card h2 {
-  font-size: 2rem;
-  font-weight: 600;
-  color: var(--md-on-surface);
-  margin: 0 0 8px 0;
-}
-
-.form-card .subtitle {
-  font-size: 1rem;
-  color: var(--md-on-surface-variant);
-  margin: 0 0 32px 0;
-}
-
-.login-form :deep(.el-input__wrapper) {
-  padding: 12px 16px;
-}
-
-.login-btn {
-  width: 100%;
-  height: 52px;
-  font-size: 1rem;
-  font-weight: 600;
-  margin-top: 16px;
-}
-
-@media (max-width: 768px) {
-  .login-container {
-    flex-direction: column;
-  }
-  
-  .brand-section {
-    padding: 32px;
-    min-height: 200px;
-  }
-  
-  .brand-section h1 {
-    font-size: 1.75rem;
-  }
-  
-  .form-section {
-    padding: 32px;
-  }
-}
-
-/* 页脚 */
-.login-footer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  text-align: center;
-  padding: 16px;
-  color: var(--md-on-surface-variant);
-  font-size: 0.875rem;
-}
-
-.login-footer a {
-  color: var(--md-on-surface-variant);
-  text-decoration: none;
-  border-bottom: 1px solid var(--md-outline-variant);
-  transition: border-color 0.2s;
-}
-
-.login-footer a:hover {
-  border-color: var(--md-primary);
-}
-</style>

@@ -1,382 +1,291 @@
 <template>
-  <div class="user-management">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>用户管理</span>
-          <el-button 
-            v-if="authStore.isAdmin" 
-            type="primary" 
-            @click="showCreateDialog = true"
-          >
-            <el-icon><Plus /></el-icon>
+  <div class="mx-auto max-w-5xl space-y-6">
+    <Card>
+      <CardHeader>
+        <div class="flex w-full flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle>用户列表</CardTitle>
+            <CardDescription>管理员可创建用户并管理角色</CardDescription>
+          </div>
+          <Button v-if="authStore.isAdmin" size="sm" @click="openCreate">
+            <Plus />
             新建用户
-          </el-button>
+          </Button>
         </div>
-      </template>
+      </CardHeader>
+      <CardContent class="px-0 pb-0">
+        <div v-if="loading" class="flex justify-center py-16">
+          <Loader2 class="size-7 animate-spin text-muted-foreground" />
+        </div>
+        <Table v-else-if="users.length > 0">
+          <TableHeader>
+            <TableRow>
+              <TableHead class="pl-6">ID</TableHead>
+              <TableHead>用户名</TableHead>
+              <TableHead>邮箱</TableHead>
+              <TableHead>角色</TableHead>
+              <TableHead>创建时间</TableHead>
+              <TableHead class="pr-6 text-right">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="user in users" :key="user.id">
+              <TableCell class="pl-6 text-muted-foreground">{{ user.id }}</TableCell>
+              <TableCell class="font-medium">{{ user.username }}</TableCell>
+              <TableCell class="text-muted-foreground">{{ user.email }}</TableCell>
+              <TableCell>
+                <Badge :variant="user.role === 'admin' ? 'default' : user.role === 'user' ? 'success' : 'secondary'">
+                  {{ getRoleText(user.role) }}
+                </Badge>
+              </TableCell>
+              <TableCell class="text-muted-foreground">{{ formatTime(user.created_at) }}</TableCell>
+              <TableCell class="pr-6">
+                <div class="flex justify-end gap-1">
+                  <Button variant="ghost" size="sm" :disabled="!canEdit(user)" @click="openUsername(user)">
+                    改用户名
+                  </Button>
+                  <Button variant="ghost" size="sm" :disabled="!canEdit(user)" @click="openPassword(user)">
+                    改密码
+                  </Button>
+                  <Button
+                    v-if="authStore.isAdmin && user.id !== authStore.user.id"
+                    variant="ghost"
+                    size="sm"
+                    class="text-destructive hover:text-destructive"
+                    @click="handleDelete(user)"
+                  >
+                    删除
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <CardContent v-else>
+          <Empty description="暂无用户" />
+        </CardContent>
+      </CardContent>
+    </Card>
 
-      <el-table :data="users" v-loading="loading" stripe>
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="username" label="用户名" />
-        <el-table-column prop="email" label="邮箱" />
-        <el-table-column prop="role" label="角色" width="120">
-          <template #default="{ row }">
-            <el-tag :type="getRoleType(row.role)">
-              {{ getRoleText(row.role) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180">
-          <template #default="{ row }">
-            {{ formatDate(row.created_at) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="280">
-          <template #default="{ row }">
-            <el-button 
-              size="small" 
-              @click="editUsername(row)"
-              :disabled="!canEdit(row)"
-            >
-              修改用户名
-            </el-button>
-            <el-button 
-              size="small" 
-              @click="editPassword(row)"
-              :disabled="!canEdit(row)"
-            >
-              修改密码
-            </el-button>
-            <el-button 
-              v-if="authStore.isAdmin && row.id !== authStore.user.id"
-              size="small" 
-              type="danger" 
-              @click="deleteUser(row)"
-            >
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+    <!-- 新建用户 -->
+    <Dialog :open="showCreate" @update:open="showCreate = $event" class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>新建用户</DialogTitle>
+        <DialogDescription>创建新用户并分配角色</DialogDescription>
+      </DialogHeader>
+      <div class="space-y-4">
+        <div class="space-y-2">
+          <Label>用户名</Label>
+          <Input v-model="createForm.username" placeholder="3-50 个字符" />
+        </div>
+        <div class="space-y-2">
+          <Label>邮箱</Label>
+          <Input v-model="createForm.email" type="email" placeholder="user@example.com" />
+        </div>
+        <div class="space-y-2">
+          <Label>密码</Label>
+          <Input v-model="createForm.password" type="password" placeholder="至少 6 位" />
+        </div>
+        <div class="space-y-2">
+          <Label>角色</Label>
+          <Select v-model="createForm.role" :options="[
+            { label: '普通用户', value: 'user' },
+            { label: '访客（只读）', value: 'viewer' }
+          ]" />
+        </div>
+      </div>
+      <DialogFooter class="mt-2">
+        <Button variant="outline" @click="showCreate = false">取消</Button>
+        <Button :loading="creating" @click="handleCreate">确定</Button>
+      </DialogFooter>
+    </Dialog>
 
-    <!-- 新建用户对话框 -->
-    <el-dialog v-model="showCreateDialog" title="新建用户" width="500px">
-      <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="100px">
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="createForm.username" placeholder="请输入用户名" />
-        </el-form-item>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="createForm.email" placeholder="请输入邮箱" />
-        </el-form-item>
-        <el-form-item label="密码" prop="password">
-          <el-input v-model="createForm.password" type="password" placeholder="请输入密码" />
-        </el-form-item>
-        <el-form-item label="角色" prop="role">
-          <el-select v-model="createForm.role" placeholder="请选择角色">
-            <el-option label="普通用户" value="user" />
-            <el-option label="访客" value="viewer" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleCreate" :loading="creating">确定</el-button>
-      </template>
-    </el-dialog>
+    <!-- 修改用户名 -->
+    <Dialog :open="showUsername" @update:open="showUsername = $event" class="sm:max-w-sm">
+      <DialogHeader>
+        <DialogTitle>修改用户名</DialogTitle>
+      </DialogHeader>
+      <div class="space-y-2">
+        <Label>新用户名</Label>
+        <Input v-model="usernameForm.username" placeholder="3-50 个字符" />
+      </div>
+      <DialogFooter class="mt-2">
+        <Button variant="outline" @click="showUsername = false">取消</Button>
+        <Button :loading="updating" @click="handleUpdateUsername">确定</Button>
+      </DialogFooter>
+    </Dialog>
 
-    <!-- 修改用户名对话框 -->
-    <el-dialog v-model="showUsernameDialog" title="修改用户名" width="500px">
-      <el-form ref="usernameFormRef" :model="usernameForm" :rules="usernameRules" label-width="100px">
-        <el-form-item label="新用户名" prop="username">
-          <el-input v-model="usernameForm.username" placeholder="请输入新用户名" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showUsernameDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleUpdateUsername" :loading="updating">确定</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 修改密码对话框 -->
-    <el-dialog v-model="showPasswordDialog" title="修改密码" width="500px">
-      <el-form ref="passwordFormRef" :model="passwordForm" :rules="passwordRules" label-width="100px">
-        <el-form-item label="当前密码" prop="oldPassword" v-if="passwordForm.userId === authStore.user?.id">
-          <el-input v-model="passwordForm.oldPassword" type="password" placeholder="请输入当前密码" />
-        </el-form-item>
-        <el-form-item label="新密码" prop="newPassword">
-          <el-input v-model="passwordForm.newPassword" type="password" placeholder="请输入新密码" />
-        </el-form-item>
-        <el-form-item label="确认密码" prop="confirmPassword">
-          <el-input v-model="passwordForm.confirmPassword" type="password" placeholder="请再次输入新密码" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showPasswordDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleUpdatePassword" :loading="updating">确定</el-button>
-      </template>
-    </el-dialog>
+    <!-- 修改密码 -->
+    <Dialog :open="showPassword" @update:open="showPassword = $event" class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>修改密码</DialogTitle>
+        <DialogDescription v-if="passwordForm.userId !== authStore.user?.id">
+          管理员重置他人密码无需输入当前密码
+        </DialogDescription>
+      </DialogHeader>
+      <div class="space-y-4">
+        <div v-if="passwordForm.userId === authStore.user?.id" class="space-y-2">
+          <Label>当前密码</Label>
+          <Input v-model="passwordForm.oldPassword" type="password" placeholder="请输入当前密码" />
+        </div>
+        <div class="space-y-2">
+          <Label>新密码</Label>
+          <Input v-model="passwordForm.newPassword" type="password" placeholder="至少 6 位" />
+        </div>
+        <div class="space-y-2">
+          <Label>确认新密码</Label>
+          <Input v-model="passwordForm.confirmPassword" type="password" placeholder="再次输入新密码" />
+        </div>
+      </div>
+      <DialogFooter class="mt-2">
+        <Button variant="outline" @click="showPassword = false">取消</Button>
+        <Button :loading="updating" @click="handleUpdatePassword">确定</Button>
+      </DialogFooter>
+    </Dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Loader2 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
+import { toast } from '@/composables/useToast'
+import { confirm } from '@/composables/useConfirm'
 import { authApi } from '@/api'
 import { formatTime } from '@/utils/datetime'
+import Card, { CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card.js'
+import Button from '@/components/ui/Button.vue'
+import Input from '@/components/ui/Input.vue'
+import Label from '@/components/ui/Label.vue'
+import Select from '@/components/ui/Select.vue'
+import Badge from '@/components/ui/badge.js'
+import Empty from '@/components/ui/Empty.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DialogFooter from '@/components/ui/DialogFooter.vue'
+import Table, { TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table.js'
 
 const authStore = useAuthStore()
 
 const users = ref([])
 const loading = ref(false)
-const showCreateDialog = ref(false)
-const showUsernameDialog = ref(false)
-const showPasswordDialog = ref(false)
+const showCreate = ref(false)
+const showUsername = ref(false)
+const showPassword = ref(false)
 const creating = ref(false)
 const updating = ref(false)
 
-const createFormRef = ref(null)
-const usernameFormRef = ref(null)
-const passwordFormRef = ref(null)
+const createForm = reactive({ username: '', email: '', password: '', role: 'user' })
+const usernameForm = reactive({ userId: null, username: '' })
+const passwordForm = reactive({ userId: null, oldPassword: '', newPassword: '', confirmPassword: '' })
 
-const createForm = reactive({
-  username: '',
-  email: '',
-  password: '',
-  role: 'user'
-})
+const getRoleText = (role) => ({ admin: '管理员', user: '用户', viewer: '访客' }[role] || role)
 
-const usernameForm = reactive({
-  userId: null,
-  username: ''
-})
-
-const passwordForm = reactive({
-  userId: null,
-  oldPassword: '',
-  newPassword: '',
-  confirmPassword: ''
-})
-
-const createRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 50, message: '用户名长度在3-50个字符', trigger: 'blur' }
-  ],
-  email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度至少6个字符', trigger: 'blur' }
-  ],
-  role: [
-    { required: true, message: '请选择角色', trigger: 'change' }
-  ]
-}
-
-const usernameRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 50, message: '用户名长度在3-50个字符', trigger: 'blur' }
-  ]
-}
-
-const validatePass = (rule, value, callback) => {
-  if (value === '') {
-    callback(new Error('请输入新密码'))
-  } else if (value.length < 6) {
-    callback(new Error('密码长度至少6位'))
-  } else {
-    if (passwordForm.confirmPassword !== '') {
-      passwordFormRef.value.validateField('confirmPassword')
-    }
-    callback()
-  }
-}
-
-const validateConfirmPass = (rule, value, callback) => {
-  if (value === '') {
-    callback(new Error('请再次输入密码'))
-  } else if (value !== passwordForm.newPassword) {
-    callback(new Error('两次密码输入不一致'))
-  } else {
-    callback()
-  }
-}
-
-const passwordRules = {
-  oldPassword: [
-    { required: true, message: '请输入当前密码', trigger: 'blur' }
-  ],
-  newPassword: [
-    { required: true, validator: validatePass, trigger: 'blur' }
-  ],
-  confirmPassword: [
-    { required: true, validator: validateConfirmPass, trigger: 'blur' }
-  ]
-}
-
-const getRoleType = (role) => {
-  const types = {
-    admin: 'danger',
-    user: 'success',
-    viewer: 'info'
-  }
-  return types[role] || 'info'
-}
-
-const getRoleText = (role) => {
-  const texts = {
-    admin: '管理员',
-    user: '用户',
-    viewer: '访客'
-  }
-  return texts[role] || role
-}
-
-const formatDate = (dateStr) => {
-  return formatTime(dateStr)
-}
-
-const canEdit = (user) => {
-  // 管理员可以编辑任何人，普通用户只能编辑自己
-  return authStore.isAdmin || user.id === authStore.user?.id
-}
+const canEdit = (user) =>
+  authStore.isAdmin || user.id === authStore.user?.id
 
 const loadUsers = async () => {
   try {
     loading.value = true
     const res = await authApi.getUsers()
     users.value = res.data
-  } catch (error) {
-    ElMessage.error('加载用户列表失败')
+  } catch {
+    toast.error('加载用户列表失败')
   } finally {
     loading.value = false
   }
 }
 
+const openCreate = () => {
+  Object.assign(createForm, { username: '', email: '', password: '', role: 'user' })
+  showCreate.value = true
+}
+
 const handleCreate = async () => {
+  if (createForm.username.trim().length < 3) return toast.error('用户名长度至少 3 个字符')
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(createForm.email)) return toast.error('请输入正确的邮箱地址')
+  if (createForm.password.length < 6) return toast.error('密码长度至少 6 位')
+
+  creating.value = true
   try {
-    await createFormRef.value.validate()
-    creating.value = true
-    
     await authApi.createUser(createForm)
-    
-    ElMessage.success('用户创建成功')
-    showCreateDialog.value = false
-    
-    // 重置表单
-    createFormRef.value.resetFields()
-    
-    // 重新加载列表
+    toast.success('用户创建成功')
+    showCreate.value = false
     await loadUsers()
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '创建用户失败')
+    toast.error(error?.response?.data?.message || '创建用户失败')
   } finally {
     creating.value = false
   }
 }
 
-const editUsername = (user) => {
+const openUsername = (user) => {
   usernameForm.userId = user.id
   usernameForm.username = user.username
-  showUsernameDialog.value = true
+  showUsername.value = true
 }
 
 const handleUpdateUsername = async () => {
+  if (usernameForm.username.trim().length < 3) return toast.error('用户名长度至少 3 个字符')
+  updating.value = true
   try {
-    await usernameFormRef.value.validate()
-    updating.value = true
-    
-    await authApi.updateUsername(usernameForm.userId, {
-      username: usernameForm.username
-    })
-    
-    ElMessage.success('用户名修改成功')
-    showUsernameDialog.value = false
-    
-    // 如果修改的是自己，更新本地用户信息
-    if (usernameForm.userId === authStore.user?.id) {
-      await authStore.checkAuth()
-    }
-    
-    // 重新加载列表
+    await authApi.updateUsername(usernameForm.userId, { username: usernameForm.username })
+    toast.success('用户名修改成功')
+    showUsername.value = false
+    if (usernameForm.userId === authStore.user?.id) await authStore.checkAuth()
     await loadUsers()
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '修改用户名失败')
+    toast.error(error?.response?.data?.message || '修改用户名失败')
   } finally {
     updating.value = false
   }
 }
 
-const editPassword = (user) => {
+const openPassword = (user) => {
   passwordForm.userId = user.id
   passwordForm.oldPassword = ''
   passwordForm.newPassword = ''
   passwordForm.confirmPassword = ''
-  showPasswordDialog.value = true
+  showPassword.value = true
 }
 
 const handleUpdatePassword = async () => {
+  if (passwordForm.newPassword.length < 6) return toast.error('密码长度至少 6 位')
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) return toast.error('两次密码输入不一致')
+  updating.value = true
   try {
-    await passwordFormRef.value.validate()
-    updating.value = true
-    
     await authApi.updatePassword(passwordForm.userId, {
       oldPassword: passwordForm.oldPassword,
       newPassword: passwordForm.newPassword,
       confirmPassword: passwordForm.confirmPassword
     })
-    
-    ElMessage.success('密码修改成功')
-    showPasswordDialog.value = false
+    toast.success('密码修改成功')
+    showPassword.value = false
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '修改密码失败')
+    toast.error(error?.response?.data?.message || '修改密码失败')
   } finally {
     updating.value = false
   }
 }
 
-const deleteUser = async (user) => {
+const handleDelete = async (user) => {
+  const ok = await confirm({
+    title: '删除用户',
+    description: `确定要删除用户「${user.username}」吗？此操作不可恢复。`,
+    confirmText: '删除',
+    destructive: true
+  })
+  if (!ok) return
   try {
-    await ElMessageBox.confirm(
-      `确定要删除用户 "${user.username}" 吗？此操作不可恢复。`,
-      '警告',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-    
     await authApi.deleteUser(user.id)
-    ElMessage.success('用户删除成功')
-    
-    // 重新加载列表
+    toast.success('用户删除成功')
     await loadUsers()
   } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '删除用户失败')
-    }
+    toast.error(error?.response?.data?.message || '删除用户失败')
   }
 }
 
-onMounted(() => {
-  loadUsers()
-})
+onMounted(loadUsers)
 </script>
-
-<style scoped>
-.user-management {
-  padding: 20px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-</style>

@@ -35,6 +35,24 @@ class MonitorModel {
     return db.prepare('SELECT * FROM monitors WHERE id = ?').get(id);
   }
 
+  // 根据 ID 获取监控项（附带最新检测结果，供详情页使用）
+  static getByIdWithLatest(id) {
+    return db.prepare(`
+      SELECT m.*,
+        cr.status as latest_status,
+        cr.response_time as latest_response_time,
+        cr.status_code as latest_status_code,
+        cr.checked_at as latest_check,
+        cr.extra as latest_extra,
+        (SELECT GROUP_CONCAT(mc.channel_id) FROM monitor_channels mc WHERE mc.monitor_id = m.id) as channel_ids
+      FROM monitors m
+      LEFT JOIN check_results cr ON cr.id = (
+        SELECT id FROM check_results WHERE monitor_id = m.id ORDER BY id DESC LIMIT 1
+      )
+      WHERE m.id = ?
+    `).get(id);
+  }
+
   // 根据类型获取监控项
   static getByType(type) {
     return db.prepare('SELECT * FROM monitors WHERE type = ?').all(type);

@@ -1,507 +1,502 @@
 <template>
-  <div class="system-settings">
-    <el-tabs v-model="activeTab" class="settings-tabs">
+  <div class="mx-auto max-w-5xl space-y-6">
+    <Tabs v-model="activeTab">
+      <TabsList class="flex-wrap h-auto">
+        <TabsTrigger value="basic" class="flex-none px-4">
+          <Settings2 class="size-4" />
+          基础设置
+        </TabsTrigger>
+        <TabsTrigger value="notifications" class="flex-none px-4">
+          <Bell class="size-4" />
+          通知渠道
+        </TabsTrigger>
+        <TabsTrigger value="apikeys" class="flex-none px-4">
+          <KeyRound class="size-4" />
+          API Keys
+        </TabsTrigger>
+        <TabsTrigger value="backups" class="flex-none px-4">
+          <DatabaseBackup class="size-4" />
+          备份管理
+        </TabsTrigger>
+      </TabsList>
+
       <!-- ================= 基础设置 ================= -->
-      <el-tab-pane label="基础设置" name="basic">
-        <el-row :gutter="24">
-          <!-- 网站基本信息 -->
-          <el-col :span="12">
-            <el-card>
-              <template #header>
-                <div class="card-header">
-                  <el-icon><Setting /></el-icon>
-                  <span>网站基本信息</span>
-                </div>
-              </template>
-
-              <el-form
-                ref="siteFormRef"
-                :model="siteForm"
-                :rules="siteRules"
-                label-width="100px"
-                label-position="top"
-              >
-                <el-form-item label="网站名称" prop="siteName">
-                  <el-input
-                    v-model="siteForm.siteName"
-                    placeholder="请输入网站名称"
-                  />
-                </el-form-item>
-
-                <el-form-item label="网站URL" prop="siteUrl">
-                  <el-input
-                    v-model="siteForm.siteUrl"
-                    placeholder="https://example.com"
-                  />
-                </el-form-item>
-
-                <el-form-item label="网站介绍" prop="siteDescription">
-                  <el-input
-                    v-model="siteForm.siteDescription"
-                    type="textarea"
-                    :rows="4"
-                    placeholder="请输入网站介绍"
-                  />
-                </el-form-item>
-
-                <el-form-item>
-                  <el-button
-                    type="primary"
-                    @click="saveSiteSettings"
-                    :loading="savingSite"
-                  >
-                    <el-icon><Check /></el-icon>
-                    保存设置
-                  </el-button>
-                </el-form-item>
-              </el-form>
-            </el-card>
-          </el-col>
-
-          <!-- 外观设置 -->
-          <el-col :span="12">
-            <el-card>
-              <template #header>
-                <div class="card-header">
-                  <el-icon><Brush /></el-icon>
-                  <span>外观设置</span>
-                </div>
-              </template>
-
-              <div class="theme-section">
-                <h4>主题模式</h4>
-                <div class="theme-options">
-                  <div
-                    class="theme-option"
-                    :class="{ active: currentTheme === 'light' }"
-                    @click="setTheme('light')"
-                  >
-                    <div class="theme-preview light">
-                      <div class="preview-header"></div>
-                      <div class="preview-content">
-                        <div class="preview-card"></div>
-                        <div class="preview-card"></div>
-                      </div>
-                    </div>
-                    <span class="theme-label">亮色模式</span>
-                    <el-icon v-if="currentTheme === 'light'" class="check-icon"><Check /></el-icon>
-                  </div>
-
-                  <div
-                    class="theme-option"
-                    :class="{ active: currentTheme === 'dark' }"
-                    @click="setTheme('dark')"
-                  >
-                    <div class="theme-preview dark">
-                      <div class="preview-header"></div>
-                      <div class="preview-content">
-                        <div class="preview-card"></div>
-                        <div class="preview-card"></div>
-                      </div>
-                    </div>
-                    <span class="theme-label">暗色模式</span>
-                    <el-icon v-if="currentTheme === 'dark'" class="check-icon"><Check /></el-icon>
-                  </div>
-
-                  <div
-                    class="theme-option"
-                    :class="{ active: currentTheme === 'auto' }"
-                    @click="setTheme('auto')"
-                  >
-                    <div class="theme-preview auto">
-                      <div class="preview-header"></div>
-                      <div class="preview-content">
-                        <div class="preview-card light"></div>
-                        <div class="preview-card dark"></div>
-                      </div>
-                    </div>
-                    <span class="theme-label">跟随系统</span>
-                    <el-icon v-if="currentTheme === 'auto'" class="check-icon"><Check /></el-icon>
-                  </div>
-                </div>
+      <TabsContent value="basic" class="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>网站信息</CardTitle>
+            <CardDescription>状态页与登录页展示的信息</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="space-y-2">
+                <Label>网站名称</Label>
+                <Input v-model="siteForm.siteName" placeholder="Uptime" />
               </div>
-
-              <el-divider />
-
-              <div class="accent-color-section">
-                <h4>强调色</h4>
-                <div class="color-options">
-                  <div
-                    v-for="color in accentColors"
-                    :key="color.value"
-                    class="color-option"
-                    :class="{ active: currentAccent === color.value }"
-                    @click="setAccentColor(color.value)"
-                  >
-                    <div class="color-circle" :style="{ backgroundColor: color.hex }"></div>
-                    <span class="color-label">{{ color.label }}</span>
-                    <el-icon v-if="currentAccent === color.value" class="check-icon"><Check /></el-icon>
-                  </div>
-                </div>
+              <div class="space-y-2">
+                <Label>网站 URL</Label>
+                <Input v-model="siteForm.siteUrl" placeholder="https://example.com" />
               </div>
-            </el-card>
+            </div>
+            <div class="space-y-2">
+              <Label>网站介绍</Label>
+              <Textarea v-model="siteForm.siteDescription" :rows="3" placeholder="服务状态监控系统" />
+            </div>
+            <Button :loading="savingSite" @click="saveSiteSettings">保存设置</Button>
+          </CardContent>
+        </Card>
 
-            <!-- 时区设置 -->
-            <el-card style="margin-top: 24px;">
-              <template #header>
-                <div class="card-header">
-                  <el-icon><Clock /></el-icon>
-                  <span>时区设置</span>
-                </div>
-              </template>
-
-              <el-form
-                :model="timezoneForm"
-                label-width="100px"
-                label-position="top"
-              >
-                <el-form-item label="显示时区">
-                  <el-select
-                    v-model="timezoneForm.timezone"
-                    placeholder="选择时区"
-                    style="width: 100%"
-                    filterable
-                  >
-                    <el-option
-                      v-for="tz in timezoneOptions"
-                      :key="tz.value"
-                      :label="tz.label"
-                      :value="tz.value"
-                    />
-                  </el-select>
-                  <div class="form-hint">选择后，所有时间显示将使用该时区</div>
-                </el-form-item>
-
-                <el-form-item label="日期时间格式">
-                  <el-select
-                    v-model="timezoneForm.dateFormat"
-                    placeholder="选择格式"
-                    style="width: 100%"
-                  >
-                    <el-option
-                      v-for="fmt in dateFormatOptions"
-                      :key="fmt.value"
-                      :label="fmt.label"
-                      :value="fmt.value"
-                    />
-                  </el-select>
-                </el-form-item>
-
-                <el-form-item>
-                  <el-button
-                    type="primary"
-                    @click="saveTimezoneSettings"
-                    :loading="savingTimezone"
-                  >
-                    <el-icon><Check /></el-icon>
-                    保存时区设置
-                  </el-button>
-                </el-form-item>
-              </el-form>
-            </el-card>
-          </el-col>
-        </el-row>
-      </el-tab-pane>
+        <Card>
+          <CardHeader>
+            <CardTitle>外观</CardTitle>
+            <CardDescription>主题模式与强调色（保存到本地浏览器）</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-5">
+            <div class="space-y-2">
+              <Label>主题模式</Label>
+              <Tabs :model-value="theme.theme.value" @update:model-value="theme.setTheme($event)">
+                <TabsList>
+                  <TabsTrigger value="light" class="flex-none px-4"><Sun class="size-4" /> 亮色</TabsTrigger>
+                  <TabsTrigger value="dark" class="flex-none px-4"><Moon class="size-4" /> 暗色</TabsTrigger>
+                  <TabsTrigger value="system" class="flex-none px-4"><MonitorCog class="size-4" /> 跟随系统</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            <div class="space-y-2">
+              <Label>强调色</Label>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="color in ACCENTS"
+                  :key="color.value"
+                  class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors cursor-pointer"
+                  :class="theme.accent.value === color.value ? 'border-primary bg-accent font-medium' : 'hover:bg-accent'"
+                  @click="theme.setAccent(color.value)"
+                >
+                  <span
+                    class="size-4 rounded-full border"
+                    :style="{ backgroundColor: color.primary }"
+                  />
+                  {{ color.label }}
+                  <Check v-if="theme.accent.value === color.value" class="size-3.5" />
+                </button>
+              </div>
+            </div>
+            <Separator />
+            <div class="space-y-2">
+              <Label>显示时区</Label>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <Select
+                  v-model="timezoneForm.timezone"
+                  :options="timezoneOptions"
+                  placeholder="选择时区"
+                  filterable
+                />
+                <Select
+                  v-model="timezoneForm.dateFormat"
+                  :options="dateFormatOptions"
+                  placeholder="日期格式"
+                />
+              </div>
+              <Button variant="outline" :loading="savingTimezone" @click="saveTimezoneSettings">
+                保存时区设置
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
 
       <!-- ================= 通知渠道 ================= -->
-      <el-tab-pane label="通知渠道" name="notifications">
-        <el-card>
-          <template #header>
-            <div class="card-header">
-              <el-icon><Bell /></el-icon>
-              <span>通知渠道</span>
-              <el-button
-                type="primary"
-                size="small"
-                style="margin-left: auto"
-                @click="openChannelDialog()"
-              >
-                <el-icon><Plus /></el-icon>&nbsp;新建渠道
-              </el-button>
+      <TabsContent value="notifications">
+        <Card>
+          <CardHeader>
+            <div class="flex w-full flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle>通知渠道</CardTitle>
+                <CardDescription>
+                  支持邮件 / Telegram / Webhook / 钉钉 / 飞书 / 企业微信；未绑定渠道的监控使用全部启用渠道
+                </CardDescription>
+              </div>
+              <Button size="sm" @click="openChannelDialog()">
+                <Plus />
+                新建渠道
+              </Button>
             </div>
-          </template>
-
-          <el-alert
-            type="info"
-            :closable="false"
-            style="margin-bottom: 16px"
-            title="监控项可以在编辑页绑定通知渠道；未绑定的监控项会使用所有已启用的渠道。"
-          />
-
-          <el-table v-if="channels.length > 0" :data="channels" stripe>
-            <el-table-column label="名称" prop="name" min-width="140" />
-            <el-table-column label="类型" width="120">
-              <template #default="{ row }">
-                <el-tag size="small">{{ channelTypeLabel(row.type) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="绑定监控数" width="110">
-              <template #default="{ row }">{{ row.monitor_ids.length }}</template>
-            </el-table-column>
-            <el-table-column label="状态" width="90">
-              <template #default="{ row }">
-                <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
-                  {{ row.enabled ? '启用' : '停用' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="220">
-              <template #default="{ row }">
-                <el-button size="small" link type="primary" :loading="testingId === row.id" @click="testChannel(row)">
-                  测试
-                </el-button>
-                <el-button size="small" link type="primary" @click="openChannelDialog(row)">编辑</el-button>
-                <el-button size="small" link type="danger" @click="deleteChannel(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-else description="还没有通知渠道" :image-size="80" />
-        </el-card>
-      </el-tab-pane>
+          </CardHeader>
+          <CardContent class="px-0 pb-0" v-if="channels.length > 0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead class="pl-6">名称</TableHead>
+                  <TableHead>类型</TableHead>
+                  <TableHead>绑定监控</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead class="pr-6 text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow v-for="row in channels" :key="row.id">
+                  <TableCell class="pl-6 font-medium">{{ row.name }}</TableCell>
+                  <TableCell><Badge variant="secondary">{{ channelTypeLabel(row.type) }}</Badge></TableCell>
+                  <TableCell class="text-muted-foreground">{{ row.monitor_ids.length }} 个</TableCell>
+                  <TableCell>
+                    <Badge :variant="row.enabled ? 'success' : 'secondary'">{{ row.enabled ? '启用' : '停用' }}</Badge>
+                  </TableCell>
+                  <TableCell class="pr-6">
+                    <div class="flex justify-end gap-1">
+                      <Button variant="ghost" size="sm" :loading="testingId === row.id" @click="testChannel(row)">
+                        测试
+                      </Button>
+                      <Button variant="ghost" size="sm" @click="openChannelDialog(row)">编辑</Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        class="text-destructive hover:text-destructive"
+                        @click="deleteChannel(row)"
+                      >
+                        删除
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </CardContent>
+          <CardContent v-else>
+            <Empty description="还没有通知渠道" />
+          </CardContent>
+        </Card>
+      </TabsContent>
 
       <!-- ================= API Keys ================= -->
-      <el-tab-pane label="API Keys" name="apikeys">
-        <el-card>
-          <template #header>
-            <div class="card-header">
-              <el-icon><Key /></el-icon>
-              <span>API Keys</span>
-              <el-button
-                type="primary"
-                size="small"
-                style="margin-left: auto"
-                @click="apiKeyDialog = true"
-              >
-                <el-icon><Plus /></el-icon>&nbsp;创建 Key
-              </el-button>
+      <TabsContent value="apikeys">
+        <Card>
+          <CardHeader>
+            <div class="flex w-full flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle>API Keys</CardTitle>
+                <CardDescription>
+                  只读访问凭证，通过 <code class="font-mono text-xs bg-muted px-1 py-0.5 rounded">X-API-Key</code> 请求头使用
+                </CardDescription>
+              </div>
+              <Button size="sm" @click="apiKeyDialog = true; newApiKey = ''">
+                <Plus />
+                创建 Key
+              </Button>
             </div>
-          </template>
-
-          <el-alert
-            type="info"
-            :closable="false"
-            style="margin-bottom: 16px"
-            title="API Key 拥有只读权限，通过请求头 X-API-Key 使用，适合接入第三方监控面板或脚本。"
-          />
-
-          <el-table v-if="apiKeys.length > 0" :data="apiKeys" stripe>
-            <el-table-column label="名称" prop="name" min-width="160" />
-            <el-table-column label="Key" prop="key_preview" width="160" />
-            <el-table-column label="创建时间" width="180">
-              <template #default="{ row }">{{ (row.created_at || '').replace('T', ' ').slice(0, 19) }}</template>
-            </el-table-column>
-            <el-table-column label="最后使用" width="180">
-              <template #default="{ row }">{{ row.last_used_at ? row.last_used_at.replace('T', ' ').slice(0, 19) : '从未使用' }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="100">
-              <template #default="{ row }">
-                <el-button size="small" link type="danger" @click="deleteApiKey(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-else description="还没有 API Key" :image-size="80" />
-        </el-card>
-      </el-tab-pane>
+          </CardHeader>
+          <CardContent class="px-0 pb-0" v-if="apiKeys.length > 0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead class="pl-6">名称</TableHead>
+                  <TableHead>Key</TableHead>
+                  <TableHead>最后使用</TableHead>
+                  <TableHead class="pr-6 text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow v-for="item in apiKeys" :key="item.id">
+                  <TableCell class="pl-6 font-medium">{{ item.name }}</TableCell>
+                  <TableCell class="font-mono text-xs text-muted-foreground">{{ item.key_preview }}</TableCell>
+                  <TableCell class="text-muted-foreground">{{ item.last_used_at ? formatTime(item.last_used_at) : '从未使用' }}</TableCell>
+                  <TableCell class="pr-6 text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="text-destructive hover:text-destructive"
+                      @click="deleteApiKey(item)"
+                    >
+                      删除
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </CardContent>
+          <CardContent v-else>
+            <Empty description="还没有 API Key" />
+          </CardContent>
+        </Card>
+      </TabsContent>
 
       <!-- ================= 备份管理 ================= -->
-      <el-tab-pane label="备份管理" name="backups">
-        <el-card>
-          <template #header>
-            <div class="card-header">
-              <el-icon><FolderChecked /></el-icon>
-              <span>数据库备份</span>
-              <el-button
-                type="primary"
-                size="small"
-                style="margin-left: auto"
-                :loading="backingUp"
-                @click="createBackup"
-              >
-                <el-icon><Plus /></el-icon>&nbsp;立即备份
-              </el-button>
+      <TabsContent value="backups">
+        <Card>
+          <CardHeader>
+            <div class="flex w-full flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle>数据库备份</CardTitle>
+                <CardDescription>每日自动备份，保留最近 {{ backupKeep }} 份</CardDescription>
+              </div>
+              <Button size="sm" :loading="backingUp" @click="createBackup">
+                <Plus />
+                立即备份
+              </Button>
             </div>
-          </template>
+          </CardHeader>
+          <CardContent class="px-0 pb-0" v-if="backups.length > 0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead class="pl-6">文件名</TableHead>
+                  <TableHead>大小</TableHead>
+                  <TableHead>时间</TableHead>
+                  <TableHead class="pr-6 text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow v-for="row in backups" :key="row.name">
+                  <TableCell class="pl-6 font-mono text-xs">{{ row.name }}</TableCell>
+                  <TableCell class="text-muted-foreground">{{ formatSize(row.size) }}</TableCell>
+                  <TableCell class="text-muted-foreground">{{ formatTime(row.created_at) }}</TableCell>
+                  <TableCell class="pr-6 text-right">
+                    <Button variant="ghost" size="sm" @click="downloadBackup(row)">下载</Button>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </CardContent>
+          <CardContent v-else>
+            <Empty description="暂无备份" />
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
 
-          <el-table v-if="backups.length > 0" :data="backups" stripe>
-            <el-table-column label="文件名" prop="name" min-width="280" />
-            <el-table-column label="大小" width="120">
-              <template #default="{ row }">{{ formatSize(row.size) }}</template>
-            </el-table-column>
-            <el-table-column label="时间" width="180">
-              <template #default="{ row }">{{ row.created_at.replace('T', ' ').slice(0, 19) }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="100">
-              <template #default="{ row }">
-                <el-button size="small" link type="primary" @click="downloadBackup(row)">下载</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-else description="暂无备份" :image-size="80" />
-        </el-card>
-      </el-tab-pane>
-    </el-tabs>
+    <!-- 通知渠道对话框 -->
+    <Dialog :open="channelDialog" @update:open="channelDialog = $event" class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>{{ editingChannel ? '编辑通知渠道' : '新建通知渠道' }}</DialogTitle>
+        <DialogDescription>配置后可发送测试消息验证</DialogDescription>
+      </DialogHeader>
+      <div class="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+        <div class="space-y-2">
+          <Label>渠道名称</Label>
+          <Input v-model="channelForm.name" placeholder="例如: 运维群机器人" />
+        </div>
+        <div class="space-y-2">
+          <Label>类型</Label>
+          <Select
+            v-model="channelForm.type"
+            :options="[
+              { label: '邮件 (SMTP)', value: 'email' },
+              { label: 'Telegram', value: 'telegram' },
+              { label: 'Webhook', value: 'webhook' },
+              { label: '钉钉机器人', value: 'dingtalk' },
+              { label: '飞书机器人', value: 'feishu' },
+              { label: '企业微信机器人', value: 'wecom' }
+            ]"
+            @update:model-value="channelForm.config = {}"
+          />
+        </div>
 
-    <!-- 通知渠道编辑对话框 -->
-    <el-dialog
-      v-model="channelDialog"
-      :title="editingChannel ? '编辑通知渠道' : '新建通知渠道'"
-      width="560px"
-    >
-      <el-form label-width="110px">
-        <el-form-item label="渠道名称" required>
-          <el-input v-model="channelForm.name" placeholder="例如: 运维群机器人" />
-        </el-form-item>
-        <el-form-item label="类型" required>
-          <el-select v-model="channelForm.type" style="width: 100%" @change="channelForm.config = {}">
-            <el-option label="邮件 (SMTP)" value="email" />
-            <el-option label="Telegram" value="telegram" />
-            <el-option label="Webhook" value="webhook" />
-            <el-option label="钉钉机器人" value="dingtalk" />
-            <el-option label="飞书机器人" value="feishu" />
-            <el-option label="企业微信机器人" value="wecom" />
-          </el-select>
-        </el-form-item>
-
-        <!-- 各类型的配置字段 -->
         <template v-if="channelForm.type === 'email'">
-          <el-form-item label="SMTP 服务器" required>
-            <el-input v-model="channelForm.config.smtpHost" placeholder="smtp.example.com" />
-          </el-form-item>
-          <el-form-item label="端口">
-            <el-input-number v-model="channelForm.config.smtpPort" :min="1" :max="65535" />
-            <el-checkbox v-model="channelForm.config.smtpSecure" style="margin-left: 16px">SSL</el-checkbox>
-          </el-form-item>
-          <el-form-item label="账号">
-            <el-input v-model="channelForm.config.smtpUser" placeholder="发件邮箱账号" />
-          </el-form-item>
-          <el-form-item label="密码/授权码">
-            <el-input v-model="channelForm.config.smtpPass" type="password" show-password placeholder="邮箱授权码" />
-          </el-form-item>
-          <el-form-item label="收件邮箱" required>
-            <el-input v-model="channelForm.config.to" placeholder="接收告警的邮箱" />
-          </el-form-item>
+          <div class="space-y-2">
+            <Label>SMTP 服务器</Label>
+            <Input v-model="channelForm.config.smtpHost" placeholder="smtp.example.com" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-2">
+              <Label>端口</Label>
+              <Input v-model.number="channelForm.config.smtpPort" type="number" placeholder="465" />
+            </div>
+            <label class="flex cursor-pointer items-end gap-2 pb-2 text-sm">
+              <Checkbox v-model="channelForm.config.smtpSecureBool" defaultChecked />
+              SSL
+            </label>
+          </div>
+          <div class="space-y-2">
+            <Label>账号</Label>
+            <Input v-model="channelForm.config.smtpUser" placeholder="发件邮箱账号" />
+          </div>
+          <div class="space-y-2">
+            <Label>密码/授权码</Label>
+            <Input v-model="channelForm.config.smtpPass" type="password" placeholder="邮箱授权码" />
+          </div>
+          <div class="space-y-2">
+            <Label>收件邮箱</Label>
+            <Input v-model="channelForm.config.to" placeholder="接收告警的邮箱" />
+          </div>
         </template>
 
         <template v-if="channelForm.type === 'telegram'">
-          <el-form-item label="Bot Token" required>
-            <el-input v-model="channelForm.config.botToken" placeholder="123456:ABC-DEF..." show-password />
-          </el-form-item>
-          <el-form-item label="Chat ID" required>
-            <el-input v-model="channelForm.config.chatId" placeholder="接收消息的 chat id" />
-          </el-form-item>
+          <div class="space-y-2">
+            <Label>Bot Token</Label>
+            <Input v-model="channelForm.config.botToken" type="password" placeholder="123456:ABC-DEF..." />
+          </div>
+          <div class="space-y-2">
+            <Label>Chat ID</Label>
+            <Input v-model="channelForm.config.chatId" placeholder="接收消息的 chat id" />
+          </div>
         </template>
 
         <template v-if="channelForm.type === 'webhook'">
-          <el-form-item label="URL" required>
-            <el-input v-model="channelForm.config.url" placeholder="https://example.com/hook" />
-          </el-form-item>
-          <el-form-item label="密钥">
-            <el-input v-model="channelForm.config.secret" placeholder="可选，通过 X-Webhook-Secret 头传递" show-password />
-          </el-form-item>
+          <div class="space-y-2">
+            <Label>URL</Label>
+            <Input v-model="channelForm.config.url" placeholder="https://example.com/hook" />
+          </div>
+          <div class="space-y-2">
+            <Label>密钥</Label>
+            <Input v-model="channelForm.config.secret" type="password" placeholder="可选，通过 X-Webhook-Secret 头传递" />
+          </div>
         </template>
 
         <template v-if="channelForm.type === 'dingtalk'">
-          <el-form-item label="Webhook" required>
-            <el-input v-model="channelForm.config.webhookUrl" placeholder="https://oapi.dingtalk.com/robot/send?access_token=..." />
-          </el-form-item>
-          <el-form-item label="加签密钥">
-            <el-input v-model="channelForm.config.secret" placeholder="SEC 开头（可选）" show-password />
-          </el-form-item>
+          <div class="space-y-2">
+            <Label>Webhook</Label>
+            <Input v-model="channelForm.config.webhookUrl" placeholder="https://oapi.dingtalk.com/robot/send?access_token=..." />
+          </div>
+          <div class="space-y-2">
+            <Label>加签密钥</Label>
+            <Input v-model="channelForm.config.secret" type="password" placeholder="SEC 开头（可选）" />
+          </div>
         </template>
 
         <template v-if="channelForm.type === 'feishu'">
-          <el-form-item label="Webhook" required>
-            <el-input v-model="channelForm.config.webhookUrl" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..." />
-          </el-form-item>
-          <el-form-item label="签名校验">
-            <el-input v-model="channelForm.config.secret" placeholder="签名密钥（可选）" show-password />
-          </el-form-item>
+          <div class="space-y-2">
+            <Label>Webhook</Label>
+            <Input v-model="channelForm.config.webhookUrl" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..." />
+          </div>
+          <div class="space-y-2">
+            <Label>签名校验</Label>
+            <Input v-model="channelForm.config.secret" type="password" placeholder="签名密钥（可选）" />
+          </div>
         </template>
 
         <template v-if="channelForm.type === 'wecom'">
-          <el-form-item label="Webhook" required>
-            <el-input v-model="channelForm.config.webhookUrl" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..." />
-          </el-form-item>
+          <div class="space-y-2">
+            <Label>Webhook</Label>
+            <Input v-model="channelForm.config.webhookUrl" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..." />
+          </div>
         </template>
 
-        <el-form-item label="启用">
-          <el-switch v-model="channelForm.enabled" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="channelDialog = false">取消</el-button>
-        <el-button type="primary" :loading="savingChannel" @click="saveChannel">保存</el-button>
-      </template>
-    </el-dialog>
+        <label class="flex cursor-pointer items-center gap-3">
+          <Switch v-model="channelForm.enabledBool" />
+          <span class="text-sm font-medium">启用</span>
+        </label>
+      </div>
+      <DialogFooter class="mt-2">
+        <Button variant="outline" @click="channelDialog = false">取消</Button>
+        <Button :loading="savingChannel" @click="saveChannel">保存</Button>
+      </DialogFooter>
+    </Dialog>
 
     <!-- 创建 API Key 对话框 -->
-    <el-dialog v-model="apiKeyDialog" title="创建 API Key" width="440px">
-      <el-form label-width="80px">
-        <el-form-item label="名称">
-          <el-input v-model="newApiKeyName" placeholder="例如: grafana 面板" />
-        </el-form-item>
-      </el-form>
-      <div v-if="newApiKey" class="new-key-box">
-        <div class="form-hint" style="margin-bottom: 8px">
-          <b>请立即保存，此 Key 仅展示一次：</b>
+    <Dialog :open="apiKeyDialog" @update:open="apiKeyDialog = $event" class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>创建 API Key</DialogTitle>
+        <DialogDescription>Key 创建后仅展示一次，请妥善保存</DialogDescription>
+      </DialogHeader>
+      <div class="space-y-4">
+        <div v-if="!newApiKey" class="space-y-2">
+          <Label>名称</Label>
+          <Input v-model="newApiKeyName" placeholder="例如: grafana 面板" @keyup.enter="createApiKey" />
         </div>
-        <el-input :model-value="newApiKey" readonly>
-          <template #append>
-            <el-button @click="copyText(newApiKey)">复制</el-button>
-          </template>
-        </el-input>
+        <div v-else class="space-y-2">
+          <Label>请立即保存此 Key：</Label>
+          <div class="flex gap-2">
+            <Input :model-value="newApiKey" readonly class="font-mono text-xs" />
+            <Button variant="outline" size="icon" class="shrink-0" @click="copyText(newApiKey)">
+              <Copy />
+            </Button>
+          </div>
+        </div>
       </div>
-      <template #footer>
-        <el-button @click="closeApiKeyDialog">关闭</el-button>
-        <el-button v-if="!newApiKey" type="primary" :loading="creatingKey" @click="createApiKey">创建</el-button>
-      </template>
-    </el-dialog>
+      <DialogFooter class="mt-2">
+        <Button variant="outline" @click="apiKeyDialog = false; newApiKey = ''">
+          {{ newApiKey ? '关闭' : '取消' }}
+        </Button>
+        <Button v-if="!newApiKey" :loading="creatingKey" @click="createApiKey">创建</Button>
+      </DialogFooter>
+    </Dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, reactive, onMounted } from 'vue'
+import {
+  Settings2, Bell, KeyRound, DatabaseBackup, Plus, Sun, Moon, MonitorCog, Check, Copy
+} from 'lucide-vue-next'
 import { settingsApi, notificationApi, apiKeyApi, backupApi } from '@/api'
-import { Clock, Bell, Key, FolderChecked, Plus } from '@element-plus/icons-vue'
+import { formatTime } from '@/utils/datetime'
+import { toast } from '@/composables/useToast'
+import { confirm } from '@/composables/useConfirm'
+import { useTheme, ACCENTS } from '@/composables/useTheme'
+import Card, { CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card.js'
+import Button from '@/components/ui/Button.vue'
+import Input from '@/components/ui/Input.vue'
+import Textarea from '@/components/ui/Textarea.vue'
+import Label from '@/components/ui/Label.vue'
+import Select from '@/components/ui/Select.vue'
+import Switch from '@/components/ui/Switch.vue'
+import Checkbox from '@/components/ui/Checkbox.vue'
+import Badge from '@/components/ui/badge.js'
+import Empty from '@/components/ui/Empty.vue'
+import Separator from '@/components/ui/separator.js'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DialogFooter from '@/components/ui/DialogFooter.vue'
+import Tabs from '@/components/ui/Tabs.vue'
+import TabsList from '@/components/ui/TabsList.vue'
+import TabsTrigger from '@/components/ui/TabsTrigger.vue'
+import TabsContent from '@/components/ui/TabsContent.vue'
+import Table, { TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table.js'
 
+const theme = useTheme()
 const activeTab = ref('basic')
-const siteFormRef = ref(null)
+
+// ===== 基础设置 =====
 const savingSite = ref(false)
-const currentTheme = ref('light')
-const currentAccent = ref('black')
 const savingTimezone = ref(false)
 const timezoneOptions = ref([])
 const dateFormatOptions = ref([])
 
-const siteForm = reactive({
-  siteName: 'Uptime',
-  siteUrl: '',
-  siteDescription: '服务状态监控系统'
-})
+const siteForm = reactive({ siteName: 'Uptime', siteUrl: '', siteDescription: '服务状态监控系统' })
+const timezoneForm = reactive({ timezone: 'UTC', dateFormat: 'YYYY-MM-DD HH:mm:ss' })
 
-const timezoneForm = reactive({
-  timezone: 'UTC',
-  dateFormat: 'YYYY-MM-DD HH:mm:ss'
-})
-
-const siteRules = {
-  siteName: [
-    { required: true, message: '请输入网站名称', trigger: 'blur' },
-    { min: 1, max: 50, message: '长度在1-50个字符', trigger: 'blur' }
-  ],
-  siteUrl: [
-    { type: 'url', message: '请输入有效的URL', trigger: 'blur' }
-  ]
+const loadSettings = async () => {
+  try {
+    const res = await settingsApi.getSiteSettings()
+    if (res.data) Object.assign(siteForm, res.data)
+  } catch { /* ignore */ }
+  try {
+    const tzRes = await settingsApi.getTimezoneSettings()
+    if (tzRes.data) Object.assign(timezoneForm, tzRes.data)
+  } catch { /* ignore */ }
+  try {
+    const optionsRes = await settingsApi.getTimezoneOptions()
+    if (optionsRes.data) {
+      timezoneOptions.value = optionsRes.data.timezones.map(t => ({ label: t.label, value: t.value }))
+      dateFormatOptions.value = optionsRes.data.dateFormats.map(f => ({ label: f.label, value: f.value }))
+    }
+  } catch { /* ignore */ }
 }
 
-const accentColors = [
-  { value: 'black', label: '经典黑', hex: '#1A1A1A' },
-  { value: 'blue', label: '科技蓝', hex: '#1976D2' },
-  { value: 'green', label: '自然绿', hex: '#388E3C' },
-  { value: 'purple', label: '优雅紫', hex: '#7B1FA2' },
-  { value: 'orange', label: '活力橙', hex: '#F57C00' },
-]
+const saveSiteSettings = async () => {
+  savingSite.value = true
+  try {
+    await settingsApi.saveSiteSettings({ ...siteForm })
+    toast.success('网站设置已保存')
+  } catch {
+    toast.error('保存失败')
+  } finally {
+    savingSite.value = false
+  }
+}
+
+const saveTimezoneSettings = async () => {
+  savingTimezone.value = true
+  try {
+    await settingsApi.saveTimezoneSettings({ ...timezoneForm })
+    toast.success('时区设置已保存')
+  } catch {
+    toast.error('保存失败')
+  } finally {
+    savingTimezone.value = false
+  }
+}
 
 // ===== 通知渠道 =====
 const channels = ref([])
@@ -510,19 +505,13 @@ const savingChannel = ref(false)
 const testingId = ref(null)
 const editingChannel = ref(null)
 const channelForm = reactive({
-  name: '',
-  type: 'webhook',
-  enabled: true,
-  config: {}
+  name: '', type: 'webhook', enabledBool: true, config: {}
 })
 
-const channelTypeLabel = (type) => {
-  const map = {
-    email: '邮件', telegram: 'Telegram', webhook: 'Webhook',
-    dingtalk: '钉钉', feishu: '飞书', wecom: '企业微信'
-  }
-  return map[type] || type
-}
+const channelTypeLabel = (type) => ({
+  email: '邮件', telegram: 'Telegram', webhook: 'Webhook',
+  dingtalk: '钉钉', feishu: '飞书', wecom: '企业微信'
+}[type] || type)
 
 const loadChannels = async () => {
   try {
@@ -536,55 +525,63 @@ const openChannelDialog = (channel = null) => {
   if (channel) {
     channelForm.name = channel.name
     channelForm.type = channel.type
-    channelForm.enabled = !!channel.enabled
+    channelForm.enabledBool = !!channel.enabled
     channelForm.config = { ...channel.config }
   } else {
     channelForm.name = ''
     channelForm.type = 'webhook'
-    channelForm.enabled = true
+    channelForm.enabledBool = true
     channelForm.config = {}
   }
   channelDialog.value = true
 }
 
 const saveChannel = async () => {
-  if (!channelForm.name.trim()) {
-    ElMessage.warning('请输入渠道名称')
-    return
-  }
+  if (!channelForm.name.trim()) return toast.error('请输入渠道名称')
   savingChannel.value = true
   try {
+    const config = { ...channelForm.config }
+    if (channelForm.config.smtpSecureBool !== undefined) {
+      config.smtpSecure = channelForm.config.smtpSecureBool
+      delete config.smtpSecureBool
+    }
     const payload = {
       name: channelForm.name.trim(),
       type: channelForm.type,
-      enabled: channelForm.enabled,
-      config: { ...channelForm.config }
+      enabled: channelForm.enabledBool,
+      config
     }
     const res = editingChannel.value
       ? await notificationApi.updateChannel(editingChannel.value.id, payload)
       : await notificationApi.createChannel(payload)
     if (res.success) {
-      ElMessage.success(editingChannel.value ? '渠道已更新' : '渠道已创建')
+      toast.success(editingChannel.value ? '渠道已更新' : '渠道已创建')
       channelDialog.value = false
       loadChannels()
     }
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '保存失败')
+    toast.error(e?.response?.data?.message || '保存失败')
   } finally {
     savingChannel.value = false
   }
 }
 
 const deleteChannel = async (channel) => {
+  const ok = await confirm({
+    title: '删除通知渠道',
+    description: `确定删除渠道「${channel.name}」？`,
+    confirmText: '删除',
+    destructive: true
+  })
+  if (!ok) return
   try {
-    await ElMessageBox.confirm(`确定删除渠道 "${channel.name}"？`, '确认', { type: 'warning' })
     const res = await notificationApi.deleteChannel(channel.id)
     if (res.success) {
-      ElMessage.success('已删除')
+      toast.success('已删除')
       loadChannels()
     }
-  } catch (e) {
-    if (e !== 'cancel') ElMessage.error('删除失败')
+  } catch {
+    toast.error('删除失败')
   }
 }
 
@@ -592,9 +589,9 @@ const testChannel = async (channel) => {
   testingId.value = channel.id
   try {
     const res = await notificationApi.testChannel(channel.id)
-    if (res.success) ElMessage.success('测试消息已发送')
+    if (res.success) toast.success('测试消息已发送')
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '发送失败')
+    toast.error(e?.response?.data?.message || '发送失败')
   } finally {
     testingId.value = null
   }
@@ -615,10 +612,7 @@ const loadApiKeys = async () => {
 }
 
 const createApiKey = async () => {
-  if (!newApiKeyName.value.trim()) {
-    ElMessage.warning('请输入名称')
-    return
-  }
+  if (!newApiKeyName.value.trim()) return toast.error('请输入名称')
   creatingKey.value = true
   try {
     const res = await apiKeyApi.create(newApiKeyName.value.trim())
@@ -627,34 +621,35 @@ const createApiKey = async () => {
       loadApiKeys()
     }
   } catch {
-    ElMessage.error('创建失败')
+    toast.error('创建失败')
   } finally {
     creatingKey.value = false
   }
 }
 
-const closeApiKeyDialog = () => {
-  apiKeyDialog.value = false
-  newApiKeyName.value = ''
-  newApiKey.value = ''
-}
-
 const deleteApiKey = async (item) => {
+  const ok = await confirm({
+    title: '删除 API Key',
+    description: `确定删除「${item.name}」？使用它的第三方将立即失效。`,
+    confirmText: '删除',
+    destructive: true
+  })
+  if (!ok) return
   try {
-    await ElMessageBox.confirm(`确定删除 API Key "${item.name}"？使用它的第三方将立即失效。`, '确认', { type: 'warning' })
     const res = await apiKeyApi.remove(item.id)
     if (res.success) {
-      ElMessage.success('已删除')
+      toast.success('已删除')
       loadApiKeys()
     }
-  } catch (e) {
-    if (e !== 'cancel') ElMessage.error('删除失败')
+  } catch {
+    toast.error('删除失败')
   }
 }
 
 // ===== 备份 =====
 const backups = ref([])
 const backingUp = ref(false)
+const backupKeep = 7
 
 const loadBackups = async () => {
   try {
@@ -668,11 +663,11 @@ const createBackup = async () => {
   try {
     const res = await backupApi.create()
     if (res.success) {
-      ElMessage.success('备份已创建')
+      toast.success('备份已创建')
       loadBackups()
     }
   } catch {
-    ElMessage.error('备份失败')
+    toast.error('备份失败')
   } finally {
     backingUp.value = false
   }
@@ -682,7 +677,7 @@ const downloadBackup = async (row) => {
   try {
     await backupApi.download(row.name)
   } catch {
-    ElMessage.error('下载失败')
+    toast.error('下载失败')
   }
 }
 
@@ -696,350 +691,16 @@ const formatSize = (bytes) => {
 const copyText = async (text) => {
   try {
     await navigator.clipboard.writeText(text)
-    ElMessage.success('已复制')
+    toast.success('已复制')
   } catch {
-    ElMessage.warning('复制失败')
+    toast.error('复制失败')
   }
 }
-
-// ===== 原有基础设置逻辑 =====
-const loadSettings = async () => {
-  try {
-    const res = await settingsApi.getSiteSettings()
-    if (res.data) {
-      Object.assign(siteForm, res.data)
-    }
-  } catch (error) {
-    console.error('加载设置失败:', error)
-  }
-
-  try {
-    const tzRes = await settingsApi.getTimezoneSettings()
-    if (tzRes.data) {
-      Object.assign(timezoneForm, tzRes.data)
-    }
-  } catch (error) {
-    console.error('加载时区设置失败:', error)
-  }
-
-  try {
-    const optionsRes = await settingsApi.getTimezoneOptions()
-    if (optionsRes.data) {
-      timezoneOptions.value = optionsRes.data.timezones
-      dateFormatOptions.value = optionsRes.data.dateFormats
-    }
-  } catch (error) {
-    console.error('加载时区选项失败:', error)
-  }
-
-  const saved = localStorage.getItem('systemSettings')
-  if (saved) {
-    const settings = JSON.parse(saved)
-    currentTheme.value = settings.theme || 'light'
-    currentAccent.value = settings.accent || 'black'
-  }
-}
-
-const saveTimezoneSettings = async () => {
-  try {
-    savingTimezone.value = true
-    await settingsApi.saveTimezoneSettings({
-      timezone: timezoneForm.timezone,
-      dateFormat: timezoneForm.dateFormat
-    })
-    ElMessage.success('时区设置已保存')
-  } catch (error) {
-    console.error(error)
-    ElMessage.error('保存失败')
-  } finally {
-    savingTimezone.value = false
-  }
-}
-
-const saveSiteSettings = async () => {
-  try {
-    await siteFormRef.value.validate()
-    savingSite.value = true
-
-    await settingsApi.saveSiteSettings({
-      siteName: siteForm.siteName,
-      siteUrl: siteForm.siteUrl,
-      siteDescription: siteForm.siteDescription
-    })
-
-    ElMessage.success('网站设置已保存')
-  } catch (error) {
-    if (error !== false) {
-      console.error(error)
-      ElMessage.error('保存失败')
-    }
-  } finally {
-    savingSite.value = false
-  }
-}
-
-const setTheme = (theme) => {
-  currentTheme.value = theme
-  const settings = JSON.parse(localStorage.getItem('systemSettings') || '{}')
-  settings.theme = theme
-  localStorage.setItem('systemSettings', JSON.stringify(settings))
-
-  applyTheme(theme)
-  ElMessage.success(`已切换到${theme === 'light' ? '亮色' : theme === 'dark' ? '暗色' : '跟随系统'}模式`)
-}
-
-const applyTheme = (theme) => {
-  const html = document.documentElement
-  if (theme === 'dark') {
-    html.classList.add('dark')
-  } else if (theme === 'light') {
-    html.classList.remove('dark')
-  } else {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    if (prefersDark) {
-      html.classList.add('dark')
-    } else {
-      html.classList.remove('dark')
-    }
-  }
-}
-
-const setAccentColor = (color) => {
-  currentAccent.value = color
-  const settings = JSON.parse(localStorage.getItem('systemSettings') || '{}')
-  settings.accent = color
-  localStorage.setItem('systemSettings', JSON.stringify(settings))
-
-  applyAccentColor(color)
-  ElMessage.success('强调色已更新')
-}
-
-const applyAccentColor = (color) => {
-  const colorMap = {
-    black: '#1A1A1A',
-    blue: '#1976D2',
-    green: '#388E3C',
-    purple: '#7B1FA2',
-    orange: '#F57C00'
-  }
-  document.documentElement.style.setProperty('--md-primary', colorMap[color])
-}
-
-let timeTimer = null
 
 onMounted(() => {
   loadSettings()
-  applyTheme(currentTheme.value)
-  applyAccentColor(currentAccent.value)
-
-  // 新标签页的数据
   loadChannels()
   loadApiKeys()
   loadBackups()
 })
-
-onUnmounted(() => {
-  if (timeTimer) clearInterval(timeTimer)
-})
 </script>
-
-<style scoped>
-.system-settings {
-  padding: 0;
-}
-
-.settings-tabs {
-  background: var(--md-surface);
-  border-radius: var(--md-shape-lg);
-  padding: 8px 24px 24px;
-  box-shadow: var(--md-elevation-1);
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--md-on-surface);
-}
-
-/* 主题选择 */
-.theme-section h4,
-.accent-color-section h4 {
-  margin: 0 0 16px 0;
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--md-on-surface);
-}
-
-.theme-options {
-  display: flex;
-  gap: 16px;
-}
-
-.theme-option {
-  flex: 1;
-  cursor: pointer;
-  padding: 12px;
-  border-radius: var(--md-shape-md);
-  border: 2px solid transparent;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.theme-option:hover {
-  background-color: var(--md-surface-variant);
-}
-
-.theme-option.active {
-  border-color: var(--md-primary);
-  background-color: var(--md-primary-container);
-}
-
-.theme-preview {
-  width: 100%;
-  height: 80px;
-  border-radius: var(--md-shape-sm);
-  overflow: hidden;
-  margin-bottom: 8px;
-  border: 1px solid var(--md-outline-variant);
-}
-
-.theme-preview.light {
-  background-color: #FFFFFF;
-}
-
-.theme-preview.dark {
-  background-color: #1A1A1A;
-}
-
-.theme-preview.auto {
-  background: linear-gradient(135deg, #FFFFFF 50%, #1A1A1A 50%);
-}
-
-.preview-header {
-  height: 20px;
-  background-color: rgba(128, 128, 128, 0.2);
-}
-
-.preview-content {
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.preview-card {
-  height: 16px;
-  border-radius: 4px;
-  background-color: rgba(128, 128, 128, 0.15);
-}
-
-.preview-card.light {
-  background-color: rgba(0, 0, 0, 0.1);
-}
-
-.preview-card.dark {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.theme-label {
-  display: block;
-  text-align: center;
-  font-size: 0.875rem;
-  color: var(--md-on-surface-variant);
-}
-
-.theme-option.active .theme-label {
-  color: var(--md-primary);
-  font-weight: 500;
-}
-
-.check-icon {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  color: var(--md-primary);
-  font-size: 1.25rem;
-}
-
-/* 强调色选择 */
-.accent-color-section {
-  margin-top: 24px;
-}
-
-.color-options {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.color-option {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 12px 16px;
-  border-radius: var(--md-shape-md);
-  border: 2px solid transparent;
-  transition: all 0.2s ease;
-  position: relative;
-  min-width: 80px;
-}
-
-.color-option:hover {
-  background-color: var(--md-surface-variant);
-}
-
-.color-option.active {
-  border-color: var(--md-primary);
-  background-color: var(--md-primary-container);
-}
-
-.color-circle {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 2px solid var(--md-outline-variant);
-}
-
-.color-label {
-  font-size: 0.875rem;
-  color: var(--md-on-surface-variant);
-}
-
-.color-option.active .color-label {
-  color: var(--md-primary);
-  font-weight: 500;
-}
-
-/* 表单样式 */
-:deep(.el-form-item__label) {
-  color: var(--md-on-surface-variant) !important;
-  font-weight: 500;
-  padding-bottom: 8px;
-}
-
-:deep(.el-input__wrapper) {
-  background-color: var(--md-surface-variant) !important;
-  border-color: var(--md-outline-variant) !important;
-}
-
-:deep(.el-textarea__inner) {
-  background-color: var(--md-surface-variant) !important;
-  border-color: var(--md-outline-variant) !important;
-}
-
-/* 时区设置样式 */
-.form-hint {
-  font-size: 0.75rem;
-  color: var(--md-on-surface-variant);
-  margin-top: 4px;
-}
-
-.new-key-box {
-  margin-top: 8px;
-}
-</style>

@@ -1,99 +1,106 @@
 <template>
-  <div class="monitor-card" :class="statusClass" @click="$emit('click')">
-    <div class="card-header">
-      <div class="status-indicator" :class="statusClass"></div>
-      <div class="header-right">
-        <el-tooltip v-if="monitor.inMaintenance" content="维护中" placement="top">
-          <el-icon class="maintenance-icon"><Tools /></el-icon>
-        </el-tooltip>
-        <el-tooltip content="立即检测" placement="top">
-          <el-button
-            class="check-btn"
-            size="small"
-            circle
-            :loading="checking"
-            @click.stop="handleCheckNow"
-          >
-            <el-icon v-if="!checking"><Refresh /></el-icon>
-          </el-button>
-        </el-tooltip>
-        <div class="monitor-type-badge">
-          {{ typeText }}
+  <Card
+    class="group relative cursor-pointer gap-0 py-0 transition-shadow hover:shadow-md"
+    @click="$emit('click')"
+  >
+    <!-- 状态顶条 -->
+    <div
+      class="h-1 rounded-t-xl"
+      :class="{
+        'bg-success': statusClass === 'up',
+        'bg-destructive': statusClass === 'down',
+        'bg-muted-foreground/30': statusClass !== 'up' && statusClass !== 'down'
+      }"
+    />
+
+    <CardHeader class="px-5 pt-4">
+      <div class="flex w-full items-start justify-between gap-2">
+        <div class="min-w-0">
+          <CardTitle class="truncate text-base">{{ monitor.name }}</CardTitle>
+          <CardDescription class="truncate mt-0.5">{{ monitor.target }}</CardDescription>
         </div>
+        <Badge variant="secondary" class="shrink-0 font-mono text-[10px]">{{ typeText }}</Badge>
       </div>
-    </div>
+    </CardHeader>
 
-    <div class="card-body">
-      <h3 class="monitor-name">{{ monitor.name }}</h3>
-      <p class="monitor-target">{{ monitor.target }}</p>
+    <CardContent class="px-5 space-y-3">
+      <div class="flex flex-wrap items-center gap-1.5" v-if="hasMeta">
+        <Badge v-if="monitor.group_name" variant="outline">{{ monitor.group_name }}</Badge>
+        <Badge v-for="tag in (monitor.tags || []).slice(0, 3)" :key="tag" variant="outline">{{ tag }}</Badge>
+        <Badge v-if="monitor.inMaintenance" variant="warning">
+          <Wrench class="size-3" />
+          维护中
+        </Badge>
+      </div>
 
-      <div class="tag-row" v-if="hasMeta">
-        <el-tag v-if="monitor.group_name" size="small" effect="plain">{{ monitor.group_name }}</el-tag>
-        <el-tag
-          v-for="tag in (monitor.tags || []).slice(0, 3)"
-          :key="tag"
-          size="small"
-          type="info"
-          effect="plain"
+      <div class="flex items-center justify-between">
+        <Badge :variant="statusVariant" class="gap-1 px-2 py-1">
+          <span
+            :class="cn('inline-block size-1.5 rounded-full',
+              statusClass === 'up' ? 'bg-success' : statusClass === 'down' ? 'bg-destructive anim-pulse-dot' : 'bg-muted-foreground')"
+          />
+          {{ statusText }}
+        </Badge>
+        <span v-if="monitor.latestResponseTime != null" class="flex items-center gap-1 text-xs text-muted-foreground">
+          <Timer class="size-3.5" />
+          {{ monitor.latestResponseTime }}ms
+        </span>
+      </div>
+    </CardContent>
+
+    <div class="mt-auto flex items-center justify-between border-t px-5 py-3">
+      <span class="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <TrendingUp class="size-3.5" />
+        {{ monitor.uptime24h ?? '—' }}{{ monitor.uptime24h != null ? '%' : '' }} 可用率
+      </span>
+      <span class="flex items-center gap-2">
+        <span v-if="monitor.latestCheck" class="text-xs text-muted-foreground/70">
+          {{ formatTimeFromNow(monitor.latestCheck) }}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          class="opacity-0 transition-opacity group-hover:opacity-100"
+          title="立即检测"
+          @click.stop="handleCheckNow"
         >
-          {{ tag }}
-        </el-tag>
-      </div>
-
-      <div class="status-info">
-        <div class="status-badge" :class="statusClass">
-          <el-icon :size="16">
-            <CircleCheck v-if="monitor.latestStatus === 'up'" />
-            <CircleClose v-else-if="monitor.latestStatus === 'down'" />
-            <Minus v-else />
-          </el-icon>
-          <span>{{ statusText }}</span>
-        </div>
-
-        <div class="metrics" v-if="monitor.latestResponseTime">
-          <div class="metric">
-            <el-icon><Timer /></el-icon>
-            <span>{{ monitor.latestResponseTime }}ms</span>
-          </div>
-        </div>
-      </div>
+          <Loader2 v-if="checking" class="animate-spin" />
+          <RefreshCw v-else class="size-3.5" />
+        </Button>
+      </span>
     </div>
-
-    <div class="card-footer">
-      <div class="uptime-badge">
-        <el-icon><TrendCharts /></el-icon>
-        <span>{{ monitor.uptime24h ?? '—' }}{{ monitor.uptime24h != null ? '%' : '' }} 可用率</span>
-      </div>
-      <div class="last-check" v-if="monitor.latestCheck">
-        {{ formatTimeFromNow(monitor.latestCheck) }}
-      </div>
-    </div>
-  </div>
+  </Card>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { Wrench, Timer, TrendingUp, RefreshCw, Loader2 } from 'lucide-vue-next'
 import { formatTimeFromNow } from '@/utils/datetime'
+import { cn } from '@/lib/utils'
+import { toast } from '@/composables/useToast'
 import { useMonitorStore } from '@/stores/monitor'
-import { useAuthStore } from '@/stores/auth'
+import Card, { CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card.js'
+import Badge from '@/components/ui/badge.js'
+import Button from '@/components/ui/Button.vue'
 
 const props = defineProps({
-  monitor: {
-    type: Object,
-    required: true
-  }
+  monitor: { type: Object, required: true }
 })
 
 defineEmits(['click'])
 
 const monitorStore = useMonitorStore()
-const authStore = useAuthStore()
 const checking = ref(false)
 
 const statusClass = computed(() => {
   if (!props.monitor.enabled) return 'disabled'
   return props.monitor.latestStatus || 'unknown'
+})
+
+const statusVariant = computed(() => {
+  if (props.monitor.inMaintenance) return 'warning'
+  const map = { up: 'success', down: 'destructive', unknown: 'secondary' }
+  return map[statusClass.value] || 'secondary'
 })
 
 const statusText = computed(() => {
@@ -109,20 +116,14 @@ const statusText = computed(() => {
 
 const typeText = computed(() => {
   const map = {
-    http: 'HTTP',
-    tcp: 'TCP',
-    ping: 'PING',
-    push: 'PUSH',
-    ssl: 'SSL',
-    domain: 'DOMAIN',
-    dns: 'DNS',
-    docker: 'DOCKER'
+    http: 'HTTP', tcp: 'TCP', ping: 'PING', push: 'PUSH',
+    ssl: 'SSL', domain: 'DOMAIN', dns: 'DNS', docker: 'DOCKER'
   }
   return map[props.monitor.type] || props.monitor.type
 })
 
 const hasMeta = computed(() =>
-  props.monitor.group_name || (props.monitor.tags && props.monitor.tags.length > 0)
+  props.monitor.group_name || (props.monitor.tags && props.monitor.tags.length > 0) || props.monitor.inMaintenance
 )
 
 const handleCheckNow = async () => {
@@ -130,181 +131,12 @@ const handleCheckNow = async () => {
   try {
     const res = await monitorStore.checkNow(props.monitor.id)
     if (res.success) {
-      ElMessage.success(`检测完成: ${res.data.status === 'up' ? '正常' : '故障'} ${res.data.responseTime ?? ''}ms`)
+      toast.success(`检测完成: ${res.data.status === 'up' ? '正常' : '故障'} ${res.data.responseTime ?? ''}ms`)
     }
   } catch {
-    ElMessage.error('检测失败')
+    toast.error('检测失败')
   } finally {
     checking.value = false
   }
 }
 </script>
-
-<style scoped>
-.monitor-card {
-  background: var(--md-surface);
-  border-radius: var(--md-shape-lg);
-  padding: 20px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid var(--md-outline-variant);
-  position: relative;
-  overflow: hidden;
-}
-
-.monitor-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--md-elevation-2);
-}
-
-.monitor-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: var(--md-outline);
-}
-
-.monitor-card.up::before {
-  background: var(--md-success);
-}
-
-.monitor-card.down::before {
-  background: var(--md-error);
-}
-
-.monitor-card.disabled::before {
-  background: var(--md-outline);
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.maintenance-icon {
-  color: #ed6c02;
-}
-
-.check-btn {
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.monitor-card:hover .check-btn {
-  opacity: 1;
-}
-
-.monitor-type-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--md-on-surface-variant);
-  background: var(--md-surface-variant);
-  padding: 4px 12px;
-  border-radius: var(--md-shape-full);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.card-body {
-  margin-bottom: 16px;
-}
-
-.monitor-name {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--md-on-surface);
-  margin: 0 0 8px 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.monitor-target {
-  font-size: 0.875rem;
-  color: var(--md-on-surface-variant);
-  margin: 0 0 12px 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tag-row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-
-.status-info {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.status-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: var(--md-shape-full);
-  font-size: 0.875rem;
-  font-weight: 500;
-  background: var(--md-surface-variant);
-  color: var(--md-on-surface-variant);
-}
-
-.status-badge.up {
-  background: var(--md-success-container);
-  color: var(--md-success);
-}
-
-.status-badge.down {
-  background: var(--md-error-container);
-  color: var(--md-error);
-}
-
-.metrics {
-  display: flex;
-  gap: 12px;
-}
-
-.metric {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.875rem;
-  color: var(--md-on-surface-variant);
-}
-
-.card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 16px;
-  border-top: 1px solid var(--md-outline-variant);
-}
-
-.uptime-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.875rem;
-  color: var(--md-on-surface-variant);
-}
-
-.last-check {
-  font-size: 0.75rem;
-  color: var(--md-outline);
-}
-</style>

@@ -1,126 +1,160 @@
 <template>
-  <div class="app-layout">
+  <div class="flex min-h-screen bg-background">
     <!-- 侧边导航栏 -->
-    <aside class="sidebar" :class="{ 'collapsed': isCollapsed }">
-      <div class="sidebar-header">
-        <div class="logo">
-          <el-icon :size="32" color="var(--md-primary)"><Monitor /></el-icon>
-          <span v-if="!isCollapsed" class="logo-text">Uptime</span>
-        </div>
-        <el-button 
-          text 
-          class="collapse-btn"
+    <aside
+      class="fixed inset-y-0 left-0 z-40 flex flex-col border-r bg-background transition-[width] duration-200"
+      :class="isCollapsed ? 'w-16' : 'w-60'"
+    >
+      <div class="flex h-14 items-center justify-between border-b px-4">
+        <router-link to="/" class="flex items-center gap-2 overflow-hidden">
+          <Activity class="size-6 text-primary shrink-0" />
+          <span v-if="!isCollapsed" class="text-lg font-bold tracking-tight truncate">Uptime</span>
+        </router-link>
+        <button
+          class="text-muted-foreground hover:text-foreground hidden md:block cursor-pointer"
           @click="isCollapsed = !isCollapsed"
         >
-          <el-icon :size="20"><Fold v-if="!isCollapsed" /><Expand v-else /></el-icon>
-        </el-button>
+          <PanelLeft :class="cn('size-5 transition-transform', isCollapsed && 'rotate-180')" />
+        </button>
       </div>
 
-      <nav class="sidebar-nav">
-        <router-link 
-          v-for="item in menuItems" 
+      <nav class="flex-1 space-y-1 p-2">
+        <router-link
+          v-for="item in menuItems"
           :key="item.path"
           :to="item.path"
-          class="nav-item"
-          :class="{ 'active': $route.path === item.path }"
+          :class="cn(
+            'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+            isActive(item.path)
+              ? 'bg-secondary text-secondary-foreground'
+              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+          )"
+          :title="item.title"
         >
-          <el-icon :size="24"><component :is="item.icon" /></el-icon>
-          <span v-if="!isCollapsed" class="nav-text">{{ item.title }}</span>
+          <component :is="item.icon" class="size-4 shrink-0" />
+          <span v-if="!isCollapsed" class="truncate">{{ item.title }}</span>
         </router-link>
       </nav>
 
-      <div class="sidebar-footer">
-        <el-dropdown trigger="click" @command="handleCommand">
-          <div class="user-profile">
-            <div class="avatar">
+      <div class="border-t p-3">
+        <DropdownMenu align="start">
+          <button class="flex w-full items-center gap-2 rounded-md p-2 hover:bg-accent transition-colors cursor-pointer">
+            <div class="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold">
               {{ authStore.user?.username?.charAt(0).toUpperCase() }}
             </div>
-            <div v-if="!isCollapsed" class="user-info">
-              <div class="username">{{ authStore.user?.username }}</div>
-              <div class="role">{{ roleText }}</div>
+            <div v-if="!isCollapsed" class="flex-1 min-w-0 text-left">
+              <div class="truncate text-sm font-medium">{{ authStore.user?.username }}</div>
+              <div class="text-xs text-muted-foreground">{{ roleText }}</div>
             </div>
-            <el-icon v-if="!isCollapsed" class="arrow"><ArrowDown /></el-icon>
-          </div>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="toggleNotify">
-                <el-icon><Bell /></el-icon>
-                <span>桌面通知：{{ monitorStore.desktopNotify ? '已开启' : '已关闭' }}</span>
-              </el-dropdown-item>
-              <el-dropdown-item command="users" v-if="authStore.isAdmin">
-                <el-icon><UserFilled /></el-icon>
-                <span>用户管理</span>
-              </el-dropdown-item>
-              <el-dropdown-item divided command="logout">
-                <el-icon><SwitchButton /></el-icon>
-                <span>退出登录</span>
-              </el-dropdown-item>
-            </el-dropdown-menu>
+            <ChevronUp v-if="!isCollapsed" class="size-4 text-muted-foreground shrink-0" />
+          </button>
+          <template #content>
+            <DropdownMenuItem data-dropdown-item @click="toggleDesktopNotify">
+              <Bell class="size-4" />
+              桌面通知：{{ monitorStore.desktopNotify ? '已开启' : '已关闭' }}
+            </DropdownMenuItem>
+            <DropdownMenuItem data-dropdown-item @click="theme.toggleDark()">
+              <Sun v-if="theme.isDark()" class="size-4" />
+              <Moon v-else class="size-4" />
+              {{ theme.isDark() ? '切换亮色' : '切换暗色' }}
+            </DropdownMenuItem>
+            <div class="bg-border -mx-1 my-1 h-px" />
+            <DropdownMenuItem v-if="authStore.isAdmin" data-dropdown-item @click="$router.push('/users')">
+              <Users class="size-4" />
+              用户管理
+            </DropdownMenuItem>
+            <DropdownMenuItem data-dropdown-item destructive @click="handleLogout">
+              <LogOut class="size-4" />
+              退出登录
+            </DropdownMenuItem>
           </template>
-        </el-dropdown>
+        </DropdownMenu>
       </div>
     </aside>
 
     <!-- 主内容区 -->
-    <main class="main-content">
-      <!-- 顶部栏 -->
-      <header class="top-bar">
-        <div class="page-title">
-          <h1>{{ pageTitle }}</h1>
-          <p class="subtitle">{{ pageSubtitle }}</p>
+    <div class="flex-1 flex flex-col min-w-0 transition-[margin] duration-200" :class="isCollapsed ? 'md:ml-16' : 'md:ml-60'">
+      <header class="flex h-14 items-center justify-between gap-4 border-b px-4 md:px-6">
+        <div class="min-w-0">
+          <h1 class="text-base font-semibold truncate">{{ pageTitle }}</h1>
+          <p class="text-xs text-muted-foreground truncate">{{ pageSubtitle }}</p>
         </div>
-        <div class="top-actions">
-          <el-button 
-            v-if="showCreateButton"
-            type="primary" 
-            size="large"
-            class="fab-button"
-            @click="handleCreate"
+        <div class="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            :title="theme.isDark() ? '切换亮色' : '切换暗色'"
+            @click="theme.toggleDark()"
           >
-            <el-icon><Plus /></el-icon>
-            <span>新建监控</span>
-          </el-button>
+            <Sun v-if="theme.isDark()" class="size-4" />
+            <Moon v-else class="size-4" />
+          </Button>
+          <Button v-if="showCreateButton" @click="$router.push('/monitors/create')">
+            <Plus />
+            新建监控
+          </Button>
         </div>
       </header>
 
-      <!-- 页面内容 -->
-      <div class="content-area">
+      <main class="flex-1 p-4 md:p-6">
         <router-view />
-      </div>
-      
-      <!-- 页脚 -->
-      <footer class="layout-footer">
-        <p>Powered by <a href="https://github.com/LangfordKuo/Uptime" target="_blank" rel="noopener noreferrer">Uptime Monitor</a></p>
+      </main>
+
+      <footer class="border-t py-4 text-center text-xs text-muted-foreground">
+        Powered by
+        <a
+          href="https://github.com/LangfordKuo/Uptime"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:text-foreground hover:underline underline-offset-2"
+        >Uptime Monitor</a>
       </footer>
-    </main>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  Activity, PanelLeft, ChevronUp, Bell, Sun, Moon, Users, LogOut, Plus,
+  LayoutDashboard, FileText, Settings, SquarePlus
+} from 'lucide-vue-next'
+import { cn } from '@/lib/utils'
+import { toast } from '@/composables/useToast'
+import { confirm } from '@/composables/useConfirm'
 import { useMonitorStore } from '@/stores/monitor'
 import { useAuthStore } from '@/stores/auth'
+import { useTheme } from '@/composables/useTheme'
+import Button from '@/components/ui/Button.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 
 const route = useRoute()
 const router = useRouter()
 const monitorStore = useMonitorStore()
 const authStore = useAuthStore()
+const theme = useTheme()
 
 const isCollapsed = ref(false)
 
 const menuItems = computed(() => {
   const items = [
-    { path: '/', title: '仪表盘', icon: 'Odometer' },
+    { path: '/', title: '仪表盘', icon: LayoutDashboard }
   ]
   if (authStore.isAdmin) {
-    items.push({ path: '/status-pages', title: '状态页管理', icon: 'Document' })
-    items.push({ path: '/system-settings', title: '系统管理', icon: 'Setting' })
+    items.push({ path: '/status-pages', title: '状态页管理', icon: FileText })
+    items.push({ path: '/system-settings', title: '系统管理', icon: Settings })
   }
-  items.push({ path: '/monitors/create', title: '新建监控', icon: 'Plus' })
+  items.push({ path: '/monitors/create', title: '新建监控', icon: SquarePlus })
   return items
 })
+
+const isActive = (path) => {
+  if (path === '/') return route.path === '/'
+  if (path === '/monitors/create') return route.path === '/monitors/create'
+  return false
+}
 
 const roleText = computed(() => {
   const map = { admin: '管理员', user: '用户', viewer: '访客' }
@@ -128,62 +162,50 @@ const roleText = computed(() => {
 })
 
 const pageTitle = computed(() => {
-  const titles = {
+  if (route.path === '/monitors/create') return '新建监控'
+  if (route.params?.id) return '监控详情'
+  const map = {
     '/': '仪表盘',
-    '/monitors/create': '新建监控',
+    '/users': '用户管理',
     '/status-pages': '状态页管理',
-    '/system-settings': '系统管理',
+    '/system-settings': '系统管理'
   }
-  return titles[route.path] || '监控详情'
+  return map[route.path] || 'Uptime'
 })
 
 const pageSubtitle = computed(() => {
-  const subtitles = {
+  const map = {
     '/': '查看所有服务的运行状态',
     '/monitors/create': '添加新的服务监控',
+    '/users': '管理系统用户',
     '/status-pages': '管理公开状态页面',
-    '/system-settings': '配置网站基本信息和外观',
+    '/system-settings': '站点、通知、密钥与备份'
   }
-  return subtitles[route.path] || ''
+  return map[route.path] || ''
 })
 
-const showCreateButton = computed(() => {
-  return route.path === '/' && (authStore.isAdmin || authStore.isUser)
-})
+const showCreateButton = computed(() =>
+  route.path === '/' && (authStore.isAdmin || authStore.isUser)
+)
 
-const handleCreate = () => {
-  router.push('/monitors/create')
+const toggleDesktopNotify = async () => {
+  const enabled = !monitorStore.desktopNotify
+  if (enabled && 'Notification' in window && Notification.permission !== 'granted') {
+    const perm = await Notification.requestPermission()
+    if (perm !== 'granted') {
+      toast.error('浏览器拒绝了通知权限')
+      return
+    }
+  }
+  monitorStore.setDesktopNotify(enabled)
+  toast.success(enabled ? '已开启故障桌面通知' : '已关闭桌面通知')
 }
 
-const handleCommand = async (command) => {
-  if (command === 'logout') {
-    try {
-      await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      })
-      authStore.logout()
-      router.push('/login')
-    } catch {
-      // 取消
-    }
-  } else if (command === 'users') {
-    router.push('/users')
-  } else if (command === 'statusPages') {
-    router.push('/status-pages')
-  } else if (command === 'toggleNotify') {
-    const enabled = !monitorStore.desktopNotify
-    if (enabled && 'Notification' in window && Notification.permission !== 'granted') {
-      const perm = await Notification.requestPermission()
-      if (perm !== 'granted') {
-        ElMessage.warning('浏览器拒绝了通知权限')
-        return
-      }
-    }
-    monitorStore.setDesktopNotify(enabled)
-    ElMessage.success(enabled ? '已开启故障桌面通知' : '已关闭桌面通知')
-  }
+const handleLogout = async () => {
+  const ok = await confirm({ title: '退出登录', description: '确定要退出当前账户吗？' })
+  if (!ok) return
+  authStore.logout()
+  router.push('/login')
 }
 
 onMounted(() => {
@@ -194,251 +216,3 @@ onUnmounted(() => {
   monitorStore.disconnectSocket()
 })
 </script>
-
-<style scoped>
-.app-layout {
-  display: flex;
-  min-height: 100vh;
-  background-color: var(--md-background);
-}
-
-/* 侧边栏 */
-.sidebar {
-  width: 280px;
-  background-color: var(--md-surface);
-  border-right: 1px solid var(--md-outline-variant);
-  display: flex;
-  flex-direction: column;
-  transition: width 0.3s ease;
-  position: fixed;
-  height: 100vh;
-  z-index: 100;
-}
-
-.sidebar.collapsed {
-  width: 80px;
-}
-
-.sidebar-header {
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--md-outline-variant);
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.logo-text {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--md-primary);
-  letter-spacing: -0.5px;
-}
-
-.collapse-btn {
-  padding: 8px;
-  color: var(--md-on-surface-variant);
-}
-
-/* 导航 */
-.sidebar-nav {
-  flex: 1;
-  padding: 16px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 20px;
-  border-radius: var(--md-shape-full);
-  color: var(--md-on-surface-variant);
-  text-decoration: none;
-  transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.nav-item:hover {
-  background-color: var(--md-surface-variant);
-  color: var(--md-on-surface);
-}
-
-.nav-item.active {
-  background-color: var(--md-secondary-container);
-  color: var(--md-on-secondary-container);
-}
-
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 60%;
-  background-color: var(--md-primary);
-  border-radius: 0 4px 4px 0;
-}
-
-.nav-text {
-  font-size: 1rem;
-  font-weight: 500;
-}
-
-/* 用户资料 */
-.sidebar-footer {
-  padding: 16px;
-  border-top: 1px solid var(--md-outline-variant);
-}
-
-.user-profile {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border-radius: var(--md-shape-md);
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.user-profile:hover {
-  background-color: var(--md-surface-variant);
-}
-
-.avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--md-shape-full);
-  background: linear-gradient(135deg, var(--md-primary), var(--md-tertiary));
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.user-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.username {
-  font-weight: 600;
-  color: var(--md-on-surface);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.role {
-  font-size: 0.75rem;
-  color: var(--md-on-surface-variant);
-}
-
-.arrow {
-  color: var(--md-on-surface-variant);
-}
-
-/* 主内容区 */
-.main-content {
-  flex: 1;
-  margin-left: 280px;
-  transition: margin-left 0.3s ease;
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar.collapsed + .main-content {
-  margin-left: 80px;
-}
-
-/* 顶部栏 */
-.top-bar {
-  padding: 24px 32px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: var(--md-background);
-}
-
-.page-title h1 {
-  font-size: 2rem;
-  font-weight: 600;
-  color: var(--md-on-background);
-  margin: 0;
-  letter-spacing: -0.5px;
-}
-
-.page-title .subtitle {
-  font-size: 1rem;
-  color: var(--md-on-surface-variant);
-  margin: 4px 0 0 0;
-}
-
-.fab-button {
-  height: 56px;
-  padding: 0 24px;
-  font-size: 1rem;
-  border-radius: var(--md-shape-full) !important;
-  box-shadow: var(--md-elevation-2);
-}
-
-.fab-button:hover {
-  box-shadow: var(--md-elevation-3);
-}
-
-/* 内容区 */
-.content-area {
-  flex: 1;
-  padding: 0 32px 32px;
-  overflow-y: auto;
-}
-
-/* 页脚 */
-.layout-footer {
-  text-align: center;
-  padding: 16px;
-  color: var(--md-on-surface-variant);
-  font-size: 0.875rem;
-  border-top: 1px solid var(--md-outline-variant);
-}
-
-.layout-footer a {
-  color: var(--md-on-surface-variant);
-  text-decoration: none;
-  border-bottom: 1px solid var(--md-outline-variant);
-  transition: border-color 0.2s;
-}
-
-.layout-footer a:hover {
-  border-color: var(--md-primary);
-}
-
-/* 响应式 */
-@media (max-width: 768px) {
-  .sidebar {
-    width: 80px;
-  }
-  
-  .sidebar .logo-text,
-  .sidebar .nav-text,
-  .sidebar .user-info,
-  .sidebar .arrow {
-    display: none;
-  }
-  
-  .main-content {
-    margin-left: 80px;
-  }
-}
-</style>
