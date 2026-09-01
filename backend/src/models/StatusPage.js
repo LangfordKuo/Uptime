@@ -1,5 +1,7 @@
+import bcrypt from 'bcryptjs';
 import db from './database.js';
 import SystemSettingModel from './SystemSetting.js';
+import StatisticsService from '../services/statisticsService.js';
 
 class StatusPageModel {
   // 获取所有状态页
@@ -25,7 +27,7 @@ class StatusPageModel {
     return stmt.get(id);
   }
 
-  // 根据 slug 获取状态页（用于公开访问）
+  // 根据 slug 获取状态页（用于公开访问，包含密码信息判断）
   static getBySlug(slug) {
     const stmt = db.prepare(`
       SELECT sp.*, u.username as creator_name
@@ -38,101 +40,108 @@ class StatusPageModel {
 
   // 创建状态页
   static create(data) {
-    const { name, slug, description, logo_url, is_public, created_by, monitor_ids } = data;
-    
+    const { name, slug, description, logo_url, password, is_public, created_by, monitor_ids } = data;
+
     const stmt = db.prepare(`
-      INSERT INTO status_pages (name, slug, description, logo_url, is_public, created_by)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO status_pages (name, slug, description, logo_url, password_hash, is_public, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    
-    const result = stmt.run(name, slug, description || null, logo_url || null, is_public ? 1 : 0, created_by);
+
+    const result = stmt.run(
+      name, slug,
+      description || null, logo_url || null,
+      password ? bcrypt.hashSync(password, 10) : null,
+      is_public ? 1 : 0,
+      created_by
+    );
     const statusPageId = result.lastInsertRowid;
-    
-    // 添加关联的监控项
+
     if (monitor_ids && monitor_ids.length > 0) {
       this.updateMonitors(statusPageId, monitor_ids);
     }
-    
+
     return this.getById(statusPageId);
   }
 
   // 更新状态页
   static update(id, data) {
-    const { name, slug, description, logo_url, is_public, monitor_ids } = data;
-    
     const fields = [];
     const values = [];
-    
-    if (name !== undefined) {
+
+    if (data.name !== undefined) {
       fields.push('name = ?');
-      values.push(name);
+      values.push(data.name);
     }
-    if (slug !== undefined) {
+    if (data.slug !== undefined) {
       fields.push('slug = ?');
-      values.push(slug);
+      values.push(data.slug);
     }
-    if (description !== undefined) {
+    if (data.description !== undefined) {
       fields.push('description = ?');
-      values.push(description);
+      values.push(data.description);
     }
-    if (logo_url !== undefined) {
+    if (data.logo_url !== undefined) {
       fields.push('logo_url = ?');
-      values.push(logo_url);
+      values.push(data.logo_url);
     }
-    if (is_public !== undefined) {
+    if (data.is_public !== undefined) {
       fields.push('is_public = ?');
-      values.push(is_public ? 1 : 0);
+      values.push(data.is_public ? 1 : 0);
     }
-    
-    fields.push('updated_at = CURRENT_TIMESTAMP');
+    // 密码：传空字符串表示移除密码，传值表示设置/修改
+    if (data.password !== undefined) {
+      fields.push('password_hash = ?');
+      values.push(data.password ? bcrypt.hashSync(data.password, 10) : null);
+    }
+
+    fields.push('updated_at = datetime(\'now\')');
     values.push(id);
-    
-    const stmt = db.prepare(`
-      UPDATE status_pages 
+
+    db.prepare(`
+      UPDATE status_pages
       SET ${fields.join(', ')}
       WHERE id = ?
-    `);
-    
-    stmt.run(...values);
-    
-    // 更新关联的监控项
-    if (monitor_ids !== undefined) {
-      this.updateMonitors(id, monitor_ids);
+    `).run(...values);
+
+    if (data.monitor_ids !== undefined) {
+      this.updateMonitors(id, data.monitor_ids);
     }
-    
+
     return this.getById(id);
+  }
+
+  // 校验状态页密码
+  static verifyPassword(statusPage, password) {
+    if (!statusPage.password_hash) return true;
+    if (!password) return false;
+    return bcrypt.compareSync(password, statusPage.password_hash);
   }
 
   // 删除状态页
   static delete(id) {
-    const stmt = db.prepare('DELETE FROM status_pages WHERE id = ?');
-    const result = stmt.run(id);
+    const result = db.prepare('DELETE FROM status_pages WHERE id = ?').run(id);
     return result.changes > 0;
   }
 
   // 更新状态页关联的监控项
   static updateMonitors(statusPageId, monitorIds) {
-    // 删除旧的关联
-    const deleteStmt = db.prepare('DELETE FROM status_page_monitors WHERE status_page_id = ?');
-    deleteStmt.run(statusPageId);
-    
-    // 添加新的关联
+    db.prepare('DELETE FROM status_page_monitors WHERE status_page_id = ?').run(statusPageId);
+
     if (monitorIds && monitorIds.length > 0) {
       const insertStmt = db.prepare(`
         INSERT INTO status_page_monitors (status_page_id, monitor_id, display_order)
         VALUES (?, ?, ?)
       `);
-      
       monitorIds.forEach((monitorId, index) => {
         insertStmt.run(statusPageId, monitorId, index);
       });
     }
   }
 
-  // 获取状态页关联的监控项
-  static getMonitors(statusPageId) {
-    const stmt = db.prepare(`
-      SELECT 
+  // 获取状态页关联的监控项（含最新状态与 30 天每日可用率，聚合查询）
+  static getMonitors(statusPageId, days = 30) {
+    const monitors = db.prepare(`
+      SELECT
         m.id,
         m.name,
         m.type,
@@ -140,167 +149,77 @@ class StatusPageModel {
         m.enabled,
         spm.display_name,
         spm.display_order,
-        (SELECT status FROM check_results WHERE monitor_id = m.id ORDER BY checked_at DESC LIMIT 1) as latest_status,
-        (SELECT response_time FROM check_results WHERE monitor_id = m.id ORDER BY checked_at DESC LIMIT 1) as latest_response_time,
-        (SELECT checked_at FROM check_results WHERE monitor_id = m.id ORDER BY checked_at DESC LIMIT 1) as latest_check
+        cr.status as latest_status,
+        cr.response_time as latest_response_time,
+        cr.checked_at as latest_check
       FROM status_page_monitors spm
       JOIN monitors m ON spm.monitor_id = m.id
+      LEFT JOIN check_results cr ON cr.id = (
+        SELECT id FROM check_results WHERE monitor_id = m.id ORDER BY id DESC LIMIT 1
+      )
       WHERE spm.status_page_id = ?
       ORDER BY spm.display_order ASC
-    `);
-    const monitors = stmt.all(statusPageId);
-    
-    // 为每个监控项获取30天的在线率数据
+    `).all(statusPageId);
+
+    if (monitors.length === 0) return [];
+
+    const timezone = SystemSettingModel.getTimezoneSettings().timezone || 'UTC';
+    const dailyMap = StatisticsService.getDailyUptimeMap(
+      monitors.map(m => m.id),
+      days,
+      timezone
+    );
+
     return monitors.map(monitor => {
-      const dailyUptime = this.getMonitorDailyUptime(monitor.id, 30);
-      return {
-        ...monitor,
-        daily_uptime: dailyUptime
-      };
+      const byDate = dailyMap[monitor.id] || {};
+
+      // 补全连续 days 天的日期序列
+      const dailyUptime = [];
+      const today = new Date();
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setUTCDate(d.getUTCDate() - i);
+        const dateStr = d.toISOString().slice(0, 10);
+        const stat = byDate[dateStr];
+        dailyUptime.push({
+          date: dateStr,
+          uptime: stat && stat.total > 0
+            ? Math.round((stat.up / stat.total) * 10000) / 100
+            : null,
+          total_checks: stat?.total || 0,
+          up_count: stat?.up || 0
+        });
+      }
+
+      return { ...monitor, daily_uptime: dailyUptime };
     });
   }
 
-  // 获取监控项最近N天的每日在线率
-  static getMonitorDailyUptime(monitorId, days = 30) {
-    const result = [];
-    
-    // 获取系统设置的时区
-    const settings = SystemSettingModel.getTimezoneSettings();
-    const timezone = settings.timezone || 'UTC';
-    
-    // 计算目标时区与 UTC 的偏移量（小时）
-    const getTimezoneOffset = (tz) => {
-      if (tz === 'UTC') return 0;
-      
-      const now = new Date();
-      const utcFormatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'UTC',
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: false
-      });
-      const tzFormatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: tz,
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: false
-      });
-      
-      const utcParts = utcFormatter.formatToParts(now);
-      const tzParts = tzFormatter.formatToParts(now);
-      
-      const utcDate = new Date(
-        utcParts.find(p => p.type === 'year').value,
-        parseInt(utcParts.find(p => p.type === 'month').value) - 1,
-        utcParts.find(p => p.type === 'day').value,
-        utcParts.find(p => p.type === 'hour').value,
-        utcParts.find(p => p.type === 'minute').value,
-        utcParts.find(p => p.type === 'second').value
-      );
-      
-      const tzDate = new Date(
-        tzParts.find(p => p.type === 'year').value,
-        parseInt(tzParts.find(p => p.type === 'month').value) - 1,
-        tzParts.find(p => p.type === 'day').value,
-        tzParts.find(p => p.type === 'hour').value,
-        tzParts.find(p => p.type === 'minute').value,
-        tzParts.find(p => p.type === 'second').value
-      );
-      
-      return (tzDate.getTime() - utcDate.getTime()) / (1000 * 60 * 60);
-    };
-    
-    const offsetHours = getTimezoneOffset(timezone);
-    
-    // 获取当前日期（根据设置的时区）
-    const now = new Date();
-    let today;
-    if (timezone === 'UTC') {
-      today = now.toISOString().split('T')[0];
-    } else {
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      });
-      const parts = formatter.formatToParts(now);
-      const year = parts.find(p => p.type === 'year').value;
-      const month = parts.find(p => p.type === 'month').value;
-      const day = parts.find(p => p.type === 'day').value;
-      today = `${year}-${month}-${day}`;
-    }
-    
-    // 解析今天的日期字符串 YYYY-MM-DD
-    const [todayYear, todayMonth, todayDay] = today.split('-').map(Number);
-    
-    for (let i = days - 1; i >= 0; i--) {
-      // 计算目标日期
-      const targetDate = new Date(todayYear, todayMonth - 1, todayDay);
-      targetDate.setDate(targetDate.getDate() - i);
-      
-      // 格式化为 YYYY-MM-DD
-      const year = targetDate.getFullYear();
-      const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-      const day = String(targetDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-      
-      // 计算该日期在目标时区的起始和结束 UTC 时间
-      // 目标时区的 00:00:00 对应的 UTC 时间
-      const startOfDayUTC = new Date(Date.UTC(year, month - 1, day, 0, 0, 0) - offsetHours * 60 * 60 * 1000);
-      // 目标时区的 23:59:59 对应的 UTC 时间
-      const endOfDayUTC = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999) - offsetHours * 60 * 60 * 1000);
-      
-      // 查询该时间范围内的检测记录
-      const stmt = db.prepare(`
-        SELECT 
-          COUNT(*) as total_checks,
-          SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) as up_count
-        FROM check_results
-        WHERE monitor_id = ?
-          AND datetime(checked_at) >= datetime(?)
-          AND datetime(checked_at) <= datetime(?)
-      `);
-      
-      const data = stmt.get(
-        monitorId, 
-        startOfDayUTC.toISOString(),
-        endOfDayUTC.toISOString()
-      );
-      
-      if (data.total_checks > 0) {
-        const uptime = (data.up_count / data.total_checks) * 100;
-        result.push({
-          date: dateStr,
-          uptime: Math.round(uptime * 100) / 100,
-          total_checks: data.total_checks,
-          up_count: data.up_count
-        });
-      } else {
-        result.push({
-          date: dateStr,
-          uptime: null,
-          total_checks: 0,
-          up_count: 0
-        });
-      }
-    }
-    
-    return result;
+  // 获取状态页关联监控项的最近故障事件（含进行中的）
+  static getRecentIncidents(statusPageId, limit = 10) {
+    return db.prepare(`
+      SELECT i.id, i.monitor_id, m.name as monitor_name,
+             i.started_at, i.ended_at, i.duration, i.error_message
+      FROM incidents i
+      INNER JOIN status_page_monitors spm ON spm.monitor_id = i.monitor_id
+      INNER JOIN monitors m ON m.id = i.monitor_id
+      WHERE spm.status_page_id = ?
+      ORDER BY i.started_at DESC
+      LIMIT ?
+    `).all(statusPageId, limit);
   }
 
   // 检查 slug 是否已存在
   static slugExists(slug, excludeId = null) {
     let sql = 'SELECT COUNT(*) as count FROM status_pages WHERE slug = ?';
     let params = [slug];
-    
+
     if (excludeId) {
       sql += ' AND id != ?';
       params.push(excludeId);
     }
-    
-    const stmt = db.prepare(sql);
-    const result = stmt.get(...params);
+
+    const result = db.prepare(sql).get(...params);
     return result.count > 0;
   }
 }

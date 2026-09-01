@@ -1,11 +1,10 @@
 import express from 'express';
+import monitorController from '../controllers/monitorController.js';
+import { optionalAuth } from '../middleware/auth.js';
 
-function createDashboardRoutes(monitorController) {
-  const router = express.Router();
+const router = express.Router();
 
-  router.get('/', monitorController.getDashboard);
+// 仪表盘：登录后可查看（viewer / API Key 也可读），数据按角色过滤
+router.get('/', optionalAuth, monitorController.getDashboard);
 
-  return router;
-}
-
-export default createDashboardRoutes;
+export default router;

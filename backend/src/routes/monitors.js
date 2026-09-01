@@ -1,22 +1,25 @@
 import express from 'express';
+import monitorController from '../controllers/monitorController.js';
+import { authenticate, authorize } from '../middleware/auth.js';
 
-function createMonitorRoutes(monitorController) {
-  const router = express.Router();
+const router = express.Router();
 
-  // 监控项管理路由
-  router.get('/', monitorController.getAllMonitors);
-  router.post('/', monitorController.createMonitor);
-  router.get('/:id', monitorController.getMonitorById);
-  router.put('/:id', monitorController.updateMonitor);
-  router.delete('/:id', monitorController.deleteMonitor);
-  router.post('/:id/toggle', monitorController.toggleMonitor);
+// 所有角色可读（含 viewer / API Key），写入操作限 admin 和 user
+router.get('/', authenticate, authorize('admin', 'user', 'viewer'), monitorController.getAllMonitors);
+router.get('/:id', authenticate, authorize('admin', 'user', 'viewer'), monitorController.getMonitorById);
+router.get('/:id/results', authenticate, authorize('admin', 'user', 'viewer'), monitorController.getCheckResults);
+router.get('/:id/stats', authenticate, authorize('admin', 'user', 'viewer'), monitorController.getStats);
+router.get('/:id/incidents', authenticate, authorize('admin', 'user', 'viewer'), monitorController.getIncidents);
 
-  // 检测结果与统计路由
-  router.get('/:id/results', monitorController.getCheckResults);
-  router.get('/:id/stats', monitorController.getStats);
-  router.get('/:id/incidents', monitorController.getIncidents);
+// 写操作
+router.post('/', authenticate, authorize('admin', 'user'), monitorController.createMonitor);
+router.put('/:id', authenticate, authorize('admin', 'user'), monitorController.updateMonitor);
+router.delete('/:id', authenticate, authorize('admin', 'user'), monitorController.deleteMonitor);
+router.post('/:id/toggle', authenticate, authorize('admin', 'user'), monitorController.toggleMonitor);
+router.post('/:id/check', authenticate, authorize('admin', 'user'), monitorController.checkNow);
 
-  return router;
-}
+// 导入导出
+router.get('/export/data', authenticate, authorize('admin', 'user'), monitorController.exportMonitors);
+router.post('/import', authenticate, authorize('admin', 'user'), monitorController.importMonitors);
 
-export default createMonitorRoutes;
+export default router;

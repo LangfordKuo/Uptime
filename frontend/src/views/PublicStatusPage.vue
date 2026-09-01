@@ -1,6 +1,30 @@
 <template>
   <div class="public-status-page">
     <div class="status-container">
+      <!-- 密码保护弹窗 -->
+      <div v-if="needPassword && !unlocked" class="password-gate">
+        <div class="password-card">
+          <h2>🔒 此状态页受密码保护</h2>
+          <p>请输入访问密码</p>
+          <el-input
+            v-model="passwordInput"
+            type="password"
+            placeholder="访问密码"
+            show-password
+            @keyup.enter="submitPassword"
+          />
+          <el-button
+            type="primary"
+            style="margin-top: 16px; width: 100%"
+            :loading="loading"
+            @click="submitPassword"
+          >
+            解锁
+          </el-button>
+        </div>
+      </div>
+
+      <template v-else>
       <!-- 头部 -->
       <header class="status-header">
         <div v-if="statusPage?.logo_url" class="logo">
@@ -41,10 +65,11 @@
                 <div class="status-dot" :class="monitor.latest_status || 'unknown'"></div>
                 <span class="service-name">{{ monitor.display_name || monitor.name }}</span>
                 <span class="service-type">{{ getTypeText(monitor.type) }}</span>
+                <span v-if="monitor.in_maintenance" class="maintenance-badge">维护中</span>
               </div>
               <div class="service-status">
                 <span class="status-text" :class="monitor.latest_status || 'unknown'">
-                  {{ getStatusText(monitor.latest_status) }}
+                  {{ monitor.in_maintenance ? '维护中' : getStatusText(monitor.latest_status) }}
                 </span>
                 <span v-if="monitor.latest_response_time" class="response-time">
                   {{ monitor.latest_response_time }}ms
@@ -74,10 +99,40 @@
         </div>
       </div>
 
+      <!-- 最近故障事件 -->
+      <div class="services-section" v-if="statusPage?.recent_incidents?.length > 0">
+        <h3>最近事件</h3>
+        <div class="incidents-list">
+          <div
+            v-for="incident in statusPage.recent_incidents"
+            :key="incident.id"
+            class="incident-item"
+          >
+            <div class="incident-header">
+              <span class="incident-status" :class="incident.ended_at ? 'resolved' : 'ongoing'">
+                {{ incident.ended_at ? '已恢复' : '故障中' }}
+              </span>
+              <span class="incident-monitor">{{ incident.monitor_name }}</span>
+            </div>
+            <div class="incident-meta" v-if="incident.error_message">
+              {{ incident.error_message }}
+            </div>
+            <div class="incident-meta">
+              {{ formatTime(incident.started_at) }}
+              <template v-if="incident.ended_at">
+                → {{ formatTime(incident.ended_at) }}（持续 {{ formatIncidentDuration(incident.duration) }}）
+              </template>
+              <template v-else> · 进行中</template>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 页脚 -->
       <footer class="status-footer">
         <p>Powered by <a href="https://github.com/LangfordKuo/Uptime" target="_blank" rel="noopener noreferrer">Uptime Monitor</a></p>
       </footer>
+      </template>
     </div>
   </div>
 </template>
@@ -91,13 +146,19 @@ import { loadTimezoneSettings, formatWithSystemTimezone } from '@/utils/timezone
 
 const route = useRoute()
 const statusPage = ref(null)
+const needPassword = ref(false)
+const unlocked = ref(false)
+const passwordInput = ref('')
+const loading = ref(false)
 
 const overallStatus = computed(() => {
   if (!statusPage.value?.monitors?.length) return 'unknown'
   const monitors = statusPage.value.monitors
-  const down = monitors.filter(m => m.latest_status === 'down').length
-  const unknown = monitors.filter(m => !m.latest_status || m.latest_status === 'unknown').length
-  
+  // 维护中的监控项不参与整体状态判定
+  const active = monitors.filter(m => !m.in_maintenance)
+  const down = active.filter(m => m.latest_status === 'down').length
+  const unknown = active.filter(m => !m.latest_status || m.latest_status === 'unknown').length
+
   if (down > 0) return 'down'
   if (unknown > 0) return 'degraded'
   return 'operational'
@@ -110,8 +171,18 @@ const overallStatusText = computed(() => ({
   unknown: '状态未知'
 }[overallStatus.value]))
 
-const getTypeText = (type) => ({ http: 'HTTP', tcp: 'TCP', ping: 'PING' }[type] || type)
+const getTypeText = (type) => ({
+  http: 'HTTP', tcp: 'TCP', ping: 'PING', push: 'PUSH',
+  ssl: 'SSL', domain: '域名', dns: 'DNS', docker: 'Docker'
+}[type] || type)
 const getStatusText = (status) => ({ up: '正常', down: '故障', unknown: '未知' }[status] || '未知')
+
+const formatIncidentDuration = (seconds) => {
+  if (!seconds) return ''
+  if (seconds < 60) return `${Math.round(seconds)} 秒`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟`
+  return `${Math.floor(seconds / 3600)} 小时 ${Math.round((seconds % 3600) / 60)} 分`
+}
 
 const getHeatColor = (uptime) => {
   if (uptime === null || uptime === undefined) return 'unknown'
@@ -152,24 +223,43 @@ const formatTime = (time) => {
   return formatWithSystemTimezone(time)
 }
 
-const loadStatusPage = async () => {
+const loadStatusPage = async (password = null) => {
   try {
+    loading.value = true
     // 先加载时区设置
     await loadTimezoneSettings()
-    
-    const res = await statusPageApi.getPublic(route.params.slug)
+
+    const res = await statusPageApi.getPublic(route.params.slug, password)
     statusPage.value = res.data
-    
+    needPassword.value = false
+    unlocked.value = true
+
     // 设置页面标题
     if (statusPage.value?.name) {
       document.title = statusPage.value.name
     }
-  } catch {
-    ElMessage.error('加载失败')
+  } catch (error) {
+    if (error?.response?.status === 401 && error?.response?.data?.needsPassword) {
+      needPassword.value = true
+    } else if (error?.response?.status === 404) {
+      ElMessage.error('状态页不存在或未公开')
+    } else {
+      ElMessage.error('加载失败')
+    }
+  } finally {
+    loading.value = false
   }
 }
 
-onMounted(loadStatusPage)
+const submitPassword = () => {
+  if (!passwordInput.value) {
+    ElMessage.warning('请输入密码')
+    return
+  }
+  loadStatusPage(passwordInput.value)
+}
+
+onMounted(() => loadStatusPage())
 </script>
 
 <style scoped>
@@ -410,6 +500,93 @@ onMounted(loadStatusPage)
 .heat-cell.warning { background: var(--md-warning); }
 .heat-cell.critical { background: var(--md-error); }
 .heat-cell.unknown { background: var(--md-outline-variant); }
+
+/* 密码保护 */
+.password-gate {
+  display: flex;
+  justify-content: center;
+  padding-top: 8vh;
+}
+
+.password-card {
+  background: var(--md-surface);
+  border-radius: var(--md-shape-lg);
+  box-shadow: var(--md-elevation-2);
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+.password-card h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.4rem;
+}
+
+.password-card p {
+  color: var(--md-on-surface-variant);
+  margin: 0 0 24px 0;
+}
+
+/* 维护徽章 */
+.maintenance-badge {
+  font-size: 0.7rem;
+  color: #ed6c02;
+  background: #fff3e0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+/* 最近事件 */
+.incidents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.incident-item {
+  padding: 14px 16px;
+  background: var(--md-surface-variant);
+  border-radius: var(--md-shape-md);
+}
+
+.incident-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.incident-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.incident-status.resolved {
+  color: var(--md-success);
+  background: var(--md-success-container, #e8f5e9);
+}
+
+.incident-status.ongoing {
+  color: var(--md-error);
+  background: var(--md-error-container, #fdecea);
+}
+
+.incident-monitor {
+  font-weight: 600;
+  color: var(--md-on-surface);
+  font-size: 0.925rem;
+}
+
+.incident-meta {
+  font-size: 0.8rem;
+  color: var(--md-on-surface-variant);
+  margin-top: 2px;
+  word-break: break-all;
+}
 
 /* 页脚 */
 .status-footer {

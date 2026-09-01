@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import StatusPageModel from '../models/StatusPage.js';
+import MaintenanceModel from '../models/Maintenance.js';
 
 // 验证规则
 const createSchema = Joi.object({
@@ -9,6 +10,7 @@ const createSchema = Joi.object({
   }),
   description: Joi.string().allow('').max(500),
   logo_url: Joi.string().allow('').max(500),
+  password: Joi.string().allow('').max(100),
   is_public: Joi.boolean().default(true),
   monitor_ids: Joi.array().items(Joi.number()).default([])
 });
@@ -20,87 +22,94 @@ const updateSchema = Joi.object({
   }),
   description: Joi.string().allow('').max(500),
   logo_url: Joi.string().allow('').max(500),
+  password: Joi.string().allow('').max(100),
   is_public: Joi.boolean(),
   monitor_ids: Joi.array().items(Joi.number())
 });
+
+function fail(res, status, message) {
+  return res.status(status).json({ success: false, message });
+}
 
 class StatusPageController {
   // 获取所有状态页
   getAllStatusPages = async (req, res) => {
     try {
-      const statusPages = StatusPageModel.getAll();
-      res.json({
-        success: true,
-        data: statusPages
-      });
+      const statusPages = StatusPageModel.getAll().map(sp => ({
+        ...sp,
+        has_password: !!sp.password_hash,
+        password_hash: undefined
+      }));
+      res.json({ success: true, data: statusPages });
     } catch (error) {
       console.error('Error getting status pages:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取状态页列表失败',
-        error: error.message
-      });
+      fail(res, 500, '获取状态页列表失败');
     }
   };
 
   // 获取单个状态页（管理后台用）
   getStatusPageById = async (req, res) => {
     try {
-      const { id } = req.params;
-      const statusPage = StatusPageModel.getById(id);
+      const statusPage = StatusPageModel.getById(req.params.id);
 
       if (!statusPage) {
-        return res.status(404).json({
-          success: false,
-          message: '状态页不存在'
-        });
+        return fail(res, 404, '状态页不存在');
       }
 
-      // 获取关联的监控项
-      const monitors = StatusPageModel.getMonitors(id);
+      const monitors = StatusPageModel.getMonitors(statusPage.id);
 
       res.json({
         success: true,
         data: {
           ...statusPage,
+          has_password: !!statusPage.password_hash,
+          password_hash: undefined,
           monitors
         }
       });
     } catch (error) {
       console.error('Error getting status page:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取状态页失败',
-        error: error.message
-      });
+      fail(res, 500, '获取状态页失败');
     }
   };
 
-  // 获取公开状态页（访客访问）
+  // 获取公开状态页（访客访问，支持密码保护）
+  // 密码通过 POST body {password} 或 GET ?password= 传递
   getPublicStatusPage = async (req, res) => {
     try {
       const { slug } = req.params;
       const statusPage = StatusPageModel.getBySlug(slug);
 
       if (!statusPage) {
-        return res.status(404).json({
-          success: false,
-          message: '状态页不存在或未公开'
-        });
+        return fail(res, 404, '状态页不存在或未公开');
       }
 
-      // 获取关联的监控项
+      // 密码校验
+      if (statusPage.password_hash) {
+        const password = req.body?.password ?? req.query?.password;
+        if (!StatusPageModel.verifyPassword(statusPage, password)) {
+          return res.status(401).json({
+            success: false,
+            message: '此状态页需要密码访问',
+            needsPassword: true
+          });
+        }
+      }
+
       const monitors = StatusPageModel.getMonitors(statusPage.id);
+      const recentIncidents = StatusPageModel.getRecentIncidents(statusPage.id, 10);
+
+      // 标记维护中的监控项
+      const monitorsWithMaintenance = monitors.map(m => ({
+        ...m,
+        in_maintenance: MaintenanceModel.isInMaintenance(m.id)
+      }));
 
       // 计算最新的更新时间（取所有监控项中最新的检查时间）
       let latestUpdate = statusPage.updated_at || statusPage.created_at;
       monitors.forEach(monitor => {
-        if (monitor.latest_check) {
-          const checkTime = new Date(monitor.latest_check);
-          const currentLatest = new Date(latestUpdate);
-          if (checkTime > currentLatest) {
-            latestUpdate = monitor.latest_check;
-          }
+        if (monitor.latest_check && monitor.latest_check > latestUpdate) {
+          latestUpdate = monitor.latest_check;
         }
       });
 
@@ -114,16 +123,13 @@ class StatusPageController {
           logo_url: statusPage.logo_url,
           created_at: statusPage.created_at,
           updated_at: latestUpdate,
-          monitors
+          monitors: monitorsWithMaintenance,
+          recent_incidents: recentIncidents
         }
       });
     } catch (error) {
       console.error('Error getting public status page:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取状态页失败',
-        error: error.message
-      });
+      fail(res, 500, '获取状态页失败');
     }
   };
 
@@ -131,7 +137,7 @@ class StatusPageController {
   createStatusPage = async (req, res) => {
     try {
       const { error, value } = createSchema.validate(req.body);
-      
+
       if (error) {
         return res.status(400).json({
           success: false,
@@ -140,12 +146,8 @@ class StatusPageController {
         });
       }
 
-      // 检查 slug 是否已存在
       if (StatusPageModel.slugExists(value.slug)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Slug 已被使用，请选择其他名称'
-        });
+        return fail(res, 400, 'Slug 已被使用，请选择其他名称');
       }
 
       const statusPage = StatusPageModel.create({
@@ -155,34 +157,26 @@ class StatusPageController {
 
       res.status(201).json({
         success: true,
-        data: statusPage,
+        data: { ...statusPage, password_hash: undefined },
         message: '状态页创建成功'
       });
     } catch (error) {
       console.error('Error creating status page:', error);
-      res.status(500).json({
-        success: false,
-        message: '创建状态页失败',
-        error: error.message
-      });
+      fail(res, 500, '创建状态页失败');
     }
   };
 
   // 更新状态页
   updateStatusPage = async (req, res) => {
     try {
-      const { id } = req.params;
-      const existing = StatusPageModel.getById(id);
+      const existing = StatusPageModel.getById(req.params.id);
 
       if (!existing) {
-        return res.status(404).json({
-          success: false,
-          message: '状态页不存在'
-        });
+        return fail(res, 404, '状态页不存在');
       }
 
       const { error, value } = updateSchema.validate(req.body);
-      
+
       if (error) {
         return res.status(400).json({
           success: false,
@@ -191,59 +185,40 @@ class StatusPageController {
         });
       }
 
-      // 如果修改了 slug，检查是否已存在
       if (value.slug && value.slug !== existing.slug) {
-        if (StatusPageModel.slugExists(value.slug, id)) {
-          return res.status(400).json({
-            success: false,
-            message: 'Slug 已被使用，请选择其他名称'
-          });
+        if (StatusPageModel.slugExists(value.slug, existing.id)) {
+          return fail(res, 400, 'Slug 已被使用，请选择其他名称');
         }
       }
 
-      const statusPage = StatusPageModel.update(id, value);
+      const statusPage = StatusPageModel.update(existing.id, value);
 
       res.json({
         success: true,
-        data: statusPage,
+        data: { ...statusPage, password_hash: undefined },
         message: '状态页更新成功'
       });
     } catch (error) {
       console.error('Error updating status page:', error);
-      res.status(500).json({
-        success: false,
-        message: '更新状态页失败',
-        error: error.message
-      });
+      fail(res, 500, '更新状态页失败');
     }
   };
 
   // 删除状态页
   deleteStatusPage = async (req, res) => {
     try {
-      const { id } = req.params;
-      const existing = StatusPageModel.getById(id);
+      const existing = StatusPageModel.getById(req.params.id);
 
       if (!existing) {
-        return res.status(404).json({
-          success: false,
-          message: '状态页不存在'
-        });
+        return fail(res, 404, '状态页不存在');
       }
 
-      StatusPageModel.delete(id);
+      StatusPageModel.delete(existing.id);
 
-      res.json({
-        success: true,
-        message: '状态页删除成功'
-      });
+      res.json({ success: true, message: '状态页删除成功' });
     } catch (error) {
       console.error('Error deleting status page:', error);
-      res.status(500).json({
-        success: false,
-        message: '删除状态页失败',
-        error: error.message
-      });
+      fail(res, 500, '删除状态页失败');
     }
   };
 }

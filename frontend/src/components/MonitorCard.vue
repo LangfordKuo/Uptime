@@ -2,14 +2,43 @@
   <div class="monitor-card" :class="statusClass" @click="$emit('click')">
     <div class="card-header">
       <div class="status-indicator" :class="statusClass"></div>
-      <div class="monitor-type-badge">
-        {{ typeText }}
+      <div class="header-right">
+        <el-tooltip v-if="monitor.inMaintenance" content="维护中" placement="top">
+          <el-icon class="maintenance-icon"><Tools /></el-icon>
+        </el-tooltip>
+        <el-tooltip content="立即检测" placement="top">
+          <el-button
+            class="check-btn"
+            size="small"
+            circle
+            :loading="checking"
+            @click.stop="handleCheckNow"
+          >
+            <el-icon v-if="!checking"><Refresh /></el-icon>
+          </el-button>
+        </el-tooltip>
+        <div class="monitor-type-badge">
+          {{ typeText }}
+        </div>
       </div>
     </div>
 
     <div class="card-body">
       <h3 class="monitor-name">{{ monitor.name }}</h3>
       <p class="monitor-target">{{ monitor.target }}</p>
+
+      <div class="tag-row" v-if="hasMeta">
+        <el-tag v-if="monitor.group_name" size="small" effect="plain">{{ monitor.group_name }}</el-tag>
+        <el-tag
+          v-for="tag in (monitor.tags || []).slice(0, 3)"
+          :key="tag"
+          size="small"
+          type="info"
+          effect="plain"
+        >
+          {{ tag }}
+        </el-tag>
+      </div>
 
       <div class="status-info">
         <div class="status-badge" :class="statusClass">
@@ -33,7 +62,7 @@
     <div class="card-footer">
       <div class="uptime-badge">
         <el-icon><TrendCharts /></el-icon>
-        <span>{{ monitor.uptime24h || 0 }}% 可用率</span>
+        <span>{{ monitor.uptime24h ?? '—' }}{{ monitor.uptime24h != null ? '%' : '' }} 可用率</span>
       </div>
       <div class="last-check" v-if="monitor.latestCheck">
         {{ formatTimeFromNow(monitor.latestCheck) }}
@@ -43,8 +72,11 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { formatTimeFromNow } from '@/utils/datetime'
+import { useMonitorStore } from '@/stores/monitor'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps({
   monitor: {
@@ -55,12 +87,17 @@ const props = defineProps({
 
 defineEmits(['click'])
 
+const monitorStore = useMonitorStore()
+const authStore = useAuthStore()
+const checking = ref(false)
+
 const statusClass = computed(() => {
   if (!props.monitor.enabled) return 'disabled'
   return props.monitor.latestStatus || 'unknown'
 })
 
 const statusText = computed(() => {
+  if (props.monitor.inMaintenance) return '维护中'
   const map = {
     up: '正常运行',
     down: '服务故障',
@@ -74,10 +111,33 @@ const typeText = computed(() => {
   const map = {
     http: 'HTTP',
     tcp: 'TCP',
-    ping: 'PING'
+    ping: 'PING',
+    push: 'PUSH',
+    ssl: 'SSL',
+    domain: 'DOMAIN',
+    dns: 'DNS',
+    docker: 'DOCKER'
   }
   return map[props.monitor.type] || props.monitor.type
 })
+
+const hasMeta = computed(() =>
+  props.monitor.group_name || (props.monitor.tags && props.monitor.tags.length > 0)
+)
+
+const handleCheckNow = async () => {
+  checking.value = true
+  try {
+    const res = await monitorStore.checkNow(props.monitor.id)
+    if (res.success) {
+      ElMessage.success(`检测完成: ${res.data.status === 'up' ? '正常' : '故障'} ${res.data.responseTime ?? ''}ms`)
+    }
+  } catch {
+    ElMessage.error('检测失败')
+  } finally {
+    checking.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -126,21 +186,23 @@ const typeText = computed(() => {
   margin-bottom: 16px;
 }
 
-.status-indicator {
-  width: 12px;
-  height: 12px;
-  border-radius: var(--md-shape-full);
-  background: var(--md-outline);
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.status-indicator.up {
-  background: var(--md-success);
-  box-shadow: 0 0 8px var(--md-success);
+.maintenance-icon {
+  color: #ed6c02;
 }
 
-.status-indicator.down {
-  background: var(--md-error);
-  box-shadow: 0 0 8px var(--md-error);
+.check-btn {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.monitor-card:hover .check-btn {
+  opacity: 1;
 }
 
 .monitor-type-badge {
@@ -171,10 +233,17 @@ const typeText = computed(() => {
 .monitor-target {
   font-size: 0.875rem;
   color: var(--md-on-surface-variant);
-  margin: 0 0 16px 0;
+  margin: 0 0 12px 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.tag-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
 }
 
 .status-info {

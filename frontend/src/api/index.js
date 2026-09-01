@@ -80,19 +80,47 @@ export const monitorApi = {
     return request.post(`/monitors/${id}/toggle`);
   },
 
+  // 立即执行一次检测
+  checkNow(id) {
+    return request.post(`/monitors/${id}/check`);
+  },
+
   // 获取检测结果
   getResults(id, limit = 100) {
     return request.get(`/monitors/${id}/results`, { params: { limit } });
   },
 
-  // 获取统计数据
-  getStats(id) {
-    return request.get(`/monitors/${id}/stats`);
+  // 获取统计数据（range: 24 / 168 / 720 小时）
+  getStats(id, range = 24) {
+    return request.get(`/monitors/${id}/stats`, { params: { range } });
   },
 
   // 获取故障事件
   getIncidents(id, limit = 50) {
     return request.get(`/monitors/${id}/incidents`, { params: { limit } });
+  },
+
+  // 导出监控配置
+  exportMonitors() {
+    return request.get('/monitors/export/data');
+  },
+
+  // 导入监控配置
+  importMonitors(monitors) {
+    return request.post('/monitors/import', { monitors });
+  },
+
+  // 维护窗口
+  getMaintenance(id) {
+    return request.get(`/monitors/${id}/maintenance`);
+  },
+
+  createMaintenance(id, data) {
+    return request.post(`/monitors/${id}/maintenance`, data);
+  },
+
+  deleteMaintenance(windowId) {
+    return request.delete(`/maintenance/${windowId}`);
   }
 };
 
@@ -129,8 +157,11 @@ export const statusPageApi = {
     return request.delete(`/status-pages/${id}`);
   },
 
-  // 获取公开状态页（访客访问）
-  getPublic(slug) {
+  // 获取公开状态页（访客访问，支持密码）
+  getPublic(slug, password = null) {
+    if (password) {
+      return request.post(`/status-pages/public/${slug}`, { password });
+    }
     return request.get(`/status-pages/public/${slug}`);
   }
 };
@@ -174,5 +205,62 @@ export const settingsApi = {
   // 设置单个值（需要管理员权限）
   setSetting(key, value) {
     return request.post(`/settings/${key}`, { value });
+  }
+};
+
+// 通知渠道（管理员）
+export const notificationApi = {
+  getChannels() {
+    return request.get('/notifications/channels');
+  },
+  createChannel(data) {
+    return request.post('/notifications/channels', data);
+  },
+  updateChannel(id, data) {
+    return request.put(`/notifications/channels/${id}`, data);
+  },
+  deleteChannel(id) {
+    return request.delete(`/notifications/channels/${id}`);
+  },
+  testChannel(id) {
+    return request.post(`/notifications/channels/${id}/test`);
+  }
+};
+
+// API Key（管理员）
+export const apiKeyApi = {
+  getAll() {
+    return request.get('/api-keys');
+  },
+  create(name) {
+    return request.post('/api-keys', { name });
+  },
+  remove(id) {
+    return request.delete(`/api-keys/${id}`);
+  }
+};
+
+// 数据库备份（管理员）
+export const backupApi = {
+  list() {
+    return request.get('/backups');
+  },
+  create() {
+    return request.post('/backups');
+  },
+  // 下载走原生跳转（需要带上 token，改为 fetch + blob）
+  async download(name) {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`/api/backups/${encodeURIComponent(name)}/download`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('下载失败');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 };

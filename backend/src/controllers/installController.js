@@ -1,14 +1,8 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import Joi from 'joi';
 import UserModel from '../models/User.js';
-import { createDatabaseTables } from '../models/database.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const dbPath = path.join(__dirname, '../../database/uptime.db');
+import { ensureDatabaseOpen, isInstalled } from '../models/database.js';
+import { rotateJwtSecret } from '../middleware/auth.js';
+import { initServices } from '../container.js';
 
 // 验证规则
 const installSchema = Joi.object({
@@ -23,11 +17,10 @@ const installSchema = Joi.object({
 class InstallController {
   // 检查是否已安装
   checkInstalled(req, res) {
-    const installed = fs.existsSync(dbPath);
     res.json({
       success: true,
       data: {
-        installed
+        installed: isInstalled()
       }
     });
   }
@@ -36,7 +29,7 @@ class InstallController {
   async install(req, res) {
     try {
       // 检查是否已安装
-      if (fs.existsSync(dbPath)) {
+      if (isInstalled()) {
         return res.status(400).json({
           success: false,
           message: '系统已安装，请勿重复安装'
@@ -55,8 +48,11 @@ class InstallController {
 
       const { username, email, password } = value;
 
-      // 创建数据库表结构
-      await createDatabaseTables();
+      // 打开数据库并创建表结构
+      ensureDatabaseOpen();
+
+      // 生成随机 JWT Secret 并持久化，替代旧的硬编码默认值
+      rotateJwtSecret();
 
       // 创建管理员账户
       const user = await UserModel.create({
@@ -65,6 +61,9 @@ class InstallController {
         password,
         role: 'admin'
       });
+
+      // 热启动监控服务、调度器和备份，无需重启进程
+      initServices();
 
       res.json({
         success: true,
@@ -76,14 +75,13 @@ class InstallController {
             role: user.role
           }
         },
-        message: '安装成功'
+        message: '安装成功，监控服务已启动'
       });
     } catch (error) {
       console.error('Install error:', error);
       res.status(500).json({
         success: false,
-        message: '安装失败',
-        error: error.message
+        message: '安装失败'
       });
     }
   }

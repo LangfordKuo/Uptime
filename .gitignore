@@ -3,7 +3,8 @@ node_modules/
 package-lock.json
 
 # Backend
-backend/database/*.db
+backend/database/
+backend/backups/
 backend/logs/*.log
 backend/.env
 

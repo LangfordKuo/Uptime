@@ -72,7 +72,6 @@ class AuthController {
       res.status(500).json({
         success: false,
         message: '登录失败',
-        error: error.message
       });
     }
   }
@@ -121,7 +120,6 @@ class AuthController {
       res.status(500).json({
         success: false,
         message: '注册失败',
-        error: error.message
       });
     }
   }
@@ -147,7 +145,6 @@ class AuthController {
       res.status(500).json({
         success: false,
         message: '获取用户列表失败',
-        error: error.message
       });
     }
   }
@@ -183,7 +180,6 @@ class AuthController {
       res.status(500).json({
         success: false,
         message: '删除用户失败',
-        error: error.message
       });
     }
   }
@@ -244,7 +240,6 @@ class AuthController {
       res.status(500).json({
         success: false,
         message: '修改用户名失败',
-        error: error.message
       });
     }
   }
@@ -319,7 +314,6 @@ class AuthController {
       res.status(500).json({
         success: false,
         message: '修改密码失败',
-        error: error.message
       });
     }
   }

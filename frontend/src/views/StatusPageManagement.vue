@@ -18,6 +18,7 @@
               <span>{{ row.name }}</span>
               <el-tag v-if="row.is_public" type="success" size="small">公开</el-tag>
               <el-tag v-else type="info" size="small">私有</el-tag>
+              <el-tag v-if="row.has_password" type="warning" size="small">密码保护</el-tag>
             </div>
           </template>
         </el-table-column>
@@ -87,6 +88,18 @@
           <el-input v-model="form.logo_url" placeholder="可选，状态页Logo地址" />
         </el-form-item>
 
+        <el-form-item label="访问密码" prop="password">
+          <el-input
+            v-model="form.password"
+            type="password"
+            show-password
+            :placeholder="isEditing && form.has_password ? '已设置密码，留空保持不变' : '可选，设置后访客需输入密码'"
+          />
+          <el-checkbox v-if="isEditing && form.has_password" v-model="form.remove_password" style="width: 100%">
+            移除访问密码
+          </el-checkbox>
+        </el-form-item>
+
         <el-form-item label="公开访问" prop="is_public">
           <el-switch v-model="form.is_public" />
         </el-form-item>
@@ -153,6 +166,9 @@ const form = reactive({
   slug: '',
   description: '',
   logo_url: '',
+  password: '',
+  has_password: false,
+  remove_password: false,
   is_public: true,
   monitor_ids: []
 })
@@ -178,6 +194,9 @@ const resetForm = () => {
   form.slug = ''
   form.description = ''
   form.logo_url = ''
+  form.password = ''
+  form.has_password = false
+  form.remove_password = false
   form.is_public = true
   form.monitor_ids = []
 }
@@ -218,6 +237,9 @@ const editStatusPage = async (row) => {
     form.slug = data.slug
     form.description = data.description || ''
     form.logo_url = data.logo_url || ''
+    form.password = ''
+    form.has_password = !!data.has_password
+    form.remove_password = false
     form.is_public = data.is_public === 1
     form.monitor_ids = data.monitors ? data.monitors.map(m => m.id) : []
     
@@ -239,6 +261,13 @@ const handleSubmit = async () => {
       logo_url: form.logo_url,
       is_public: form.is_public,
       monitor_ids: form.monitor_ids
+    }
+
+    // 密码处理：勾选移除→清空；填写了新密码→修改；否则不动
+    if (form.remove_password) {
+      data.password = ''
+    } else if (form.password) {
+      data.password = form.password
     }
 
     if (isEditing.value) {

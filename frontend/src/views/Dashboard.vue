@@ -12,11 +12,6 @@
           <div class="stat-value">{{ stat.value }}</div>
           <div class="stat-label">{{ stat.label }}</div>
         </div>
-        <div class="stat-trend" v-if="stat.trend">
-          <el-tag :type="stat.trend > 0 ? 'success' : 'danger'" size="small">
-            {{ stat.trend > 0 ? '+' : '' }}{{ stat.trend }}%
-          </el-tag>
-        </div>
       </div>
     </div>
 
@@ -24,17 +19,53 @@
     <div class="monitors-section">
       <div class="section-header">
         <h2>服务监控</h2>
-        <div class="filter-tabs">
-          <button 
-            v-for="tab in filterTabs" 
-            :key="tab.value"
-            class="tab-btn"
-            :class="{ 'active': currentFilter === tab.value }"
-            @click="currentFilter = tab.value"
+        <div class="header-actions">
+          <el-select
+            v-model="groupFilter"
+            clearable
+            placeholder="全部分组"
+            size="default"
+            style="width: 150px"
           >
-            {{ tab.label }}
-          </button>
+            <el-option v-for="g in monitorStore.allGroups" :key="g" :label="g" :value="g" />
+          </el-select>
+          <el-input
+            v-model="searchText"
+            clearable
+            placeholder="搜索名称/目标"
+            style="width: 180px"
+            :prefix-icon="Search"
+          />
+          <div class="filter-tabs">
+            <button
+              v-for="tab in filterTabs"
+              :key="tab.value"
+              class="tab-btn"
+              :class="{ 'active': currentFilter === tab.value }"
+              @click="currentFilter = tab.value"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
         </div>
+      </div>
+
+      <div class="toolbar" v-if="authStore.isAdmin || authStore.isUser">
+        <el-button size="small" @click="handleExport">
+          <el-icon><Download /></el-icon>&nbsp;导出
+        </el-button>
+        <el-upload
+          :show-file-list="false"
+          accept=".json"
+          :before-upload="handleImportFile"
+        >
+          <el-button size="small">
+            <el-icon><Upload /></el-icon>&nbsp;导入
+          </el-button>
+        </el-upload>
+        <el-button size="small" @click="$router.push('/monitors/create')" type="primary">
+          <el-icon><Plus /></el-icon>&nbsp;新建监控
+        </el-button>
       </div>
 
       <div class="monitors-grid">
@@ -46,12 +77,12 @@
         />
       </div>
 
-      <el-empty 
-        v-if="filteredMonitors.length === 0" 
-        description="暂无监控项"
+      <el-empty
+        v-if="filteredMonitors.length === 0"
+        :description="monitors.length === 0 ? '暂无监控项' : '没有匹配的监控项'"
         :image-size="120"
       >
-        <el-button type="primary" @click="$router.push('/monitors/create')">
+        <el-button v-if="monitors.length === 0" type="primary" @click="$router.push('/monitors/create')">
           创建第一个监控
         </el-button>
       </el-empty>
@@ -63,15 +94,22 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import { ElMessage } from 'element-plus'
+import { Search, Download, Upload, Plus } from '@element-plus/icons-vue'
 import { useMonitorStore } from '@/stores/monitor'
+import { useAuthStore } from '@/stores/auth'
+import { monitorApi } from '@/api'
 import MonitorCard from '@/components/MonitorCard.vue'
 
 const router = useRouter()
 const monitorStore = useMonitorStore()
+const authStore = useAuthStore()
 const { monitors, dashboardStats } = storeToRefs(monitorStore)
 const { fetchDashboard } = monitorStore
 
 const currentFilter = ref('all')
+const groupFilter = ref('')
+const searchText = ref('')
 
 const statsList = computed(() => [
   {
@@ -116,15 +154,64 @@ const filterTabs = [
 ]
 
 const filteredMonitors = computed(() => {
-  if (currentFilter.value === 'all') return monitors.value
-  return monitors.value.filter(m => {
-    if (currentFilter.value === 'unknown') return !m.latestStatus || m.latestStatus === 'unknown'
-    return m.latestStatus === currentFilter.value
-  })
+  let list = monitors.value
+  if (currentFilter.value !== 'all') {
+    list = list.filter(m => {
+      if (currentFilter.value === 'unknown') return !m.latestStatus || m.latestStatus === 'unknown'
+      return m.latestStatus === currentFilter.value
+    })
+  }
+  if (groupFilter.value) {
+    list = list.filter(m => m.group_name === groupFilter.value)
+  }
+  if (searchText.value.trim()) {
+    const q = searchText.value.trim().toLowerCase()
+    list = list.filter(m =>
+      m.name.toLowerCase().includes(q) || (m.target || '').toLowerCase().includes(q)
+    )
+  }
+  return list
 })
 
 const goToDetail = (id) => {
   router.push(`/monitors/${id}`)
+}
+
+const handleExport = async () => {
+  try {
+    const res = await monitorApi.exportMonitors()
+    const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `uptime-monitors-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch {
+    ElMessage.error('导出失败')
+  }
+}
+
+const handleImportFile = async (file) => {
+  try {
+    const text = await file.text()
+    const parsed = JSON.parse(text)
+    const monitors = Array.isArray(parsed) ? parsed : parsed.monitors
+    if (!Array.isArray(monitors) || monitors.length === 0) {
+      ElMessage.error('文件中没有监控项')
+      return false
+    }
+    const res = await monitorApi.importMonitors(monitors)
+    if (res.success) {
+      const { created, failed } = res.data
+      ElMessage.success(`导入完成: 成功 ${created} 个${failed ? `，失败 ${failed} 个` : ''}`)
+      fetchDashboard()
+    }
+  } catch (e) {
+    ElMessage.error('导入失败: ' + (e?.response?.data?.message || '文件格式错误'))
+  }
+  return false // 阻止 el-upload 默认上传
 }
 
 onMounted(() => {
@@ -199,7 +286,9 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 
 .section-header h2 {
@@ -207,6 +296,19 @@ onMounted(() => {
   font-weight: 600;
   color: var(--md-on-surface);
   margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
 .filter-tabs {
@@ -258,7 +360,7 @@ onMounted(() => {
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .section-header {
     flex-direction: column;
     align-items: flex-start;

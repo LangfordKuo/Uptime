@@ -4,10 +4,17 @@
       <template #content>
         <div class="page-header-content">
           <span class="page-title">{{ monitor.name }}</span>
+          <el-tag v-if="monitor.inMaintenance" type="warning" size="large">
+            <el-icon><Tools /></el-icon> 维护中
+          </el-tag>
           <el-tag :type="statusType" size="large">{{ statusText }}</el-tag>
         </div>
       </template>
       <template #extra>
+        <el-button @click="handleCheckNow" :loading="checking">
+          <el-icon><VideoPlay /></el-icon>
+          立即检测
+        </el-button>
         <el-button @click="refreshData">
           <el-icon><Refresh /></el-icon>
           刷新
@@ -24,6 +31,35 @@
     </el-page-header>
 
     <div v-loading="loading" class="content">
+      <!-- Push 推送地址 -->
+      <el-card v-if="monitor.type === 'push' && monitor.push_token" class="section-card">
+        <template #header><span>推送地址</span></template>
+        <el-input :model-value="pushUrl" readonly>
+          <template #append>
+            <el-button @click="copyText(pushUrl)">复制</el-button>
+          </template>
+        </el-input>
+        <div class="form-help" style="margin-top: 8px">
+          定期请求此 URL 表示服务存活，例如:
+          <code>curl {{ pushUrl }}</code>
+          （心跳周期 {{ monitor.config?.period || 300 }} 秒，超时 1.5 倍判定故障）
+        </div>
+      </el-card>
+
+      <!-- SSL 证书信息 -->
+      <el-card v-if="monitor.type === 'ssl' && monitor.latestExtra" class="section-card">
+        <template #header><span>证书信息</span></template>
+        <el-descriptions :column="3" border>
+          <el-descriptions-item label="剩余天数">
+            <el-tag :type="(monitor.latestExtra.daysRemaining ?? 0) < 14 ? 'danger' : 'success'">
+              {{ monitor.latestExtra.daysRemaining }} 天
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="到期时间">{{ monitor.latestExtra.validTo }}</el-descriptions-item>
+          <el-descriptions-item label="颁发者">{{ monitor.latestExtra.issuer || '-' }}</el-descriptions-item>
+        </el-descriptions>
+      </el-card>
+
       <!-- 统计卡片 -->
       <el-row :gutter="20" class="stats-row">
         <el-col :span="6">
@@ -61,15 +97,64 @@
       </el-row>
 
       <!-- 响应时间趋势图 -->
-      <el-card class="chart-card">
+      <el-card class="section-card">
         <template #header>
-          <span>24小时响应时间趋势</span>
+          <div class="chart-header">
+            <span>响应时间趋势</span>
+            <el-radio-group v-model="chartRange" size="small" @change="refreshData">
+              <el-radio-button :label="24">24小时</el-radio-button>
+              <el-radio-button :label="168">7天</el-radio-button>
+              <el-radio-button :label="720">30天</el-radio-button>
+            </el-radio-group>
+          </div>
         </template>
         <div ref="chartRef" class="chart-container"></div>
       </el-card>
 
+      <!-- 维护窗口 -->
+      <el-card class="section-card">
+        <template #header>
+          <div class="chart-header">
+            <span>维护窗口
+              <el-tooltip content="维护期间暂停检测、不触发告警、不计入可用率" placement="top">
+                <el-icon style="vertical-align: middle"><QuestionFilled /></el-icon>
+              </el-tooltip>
+            </span>
+            <el-button size="small" type="primary" @click="maintenanceDialog = true">
+              <el-icon><Plus /></el-icon>&nbsp;添加窗口
+            </el-button>
+          </div>
+        </template>
+        <el-table v-if="maintenanceWindows.length > 0" :data="maintenanceWindows" stripe>
+          <el-table-column label="名称" prop="name">
+            <template #default="{ row }">{{ row.name || '（未命名）' }}</template>
+          </el-table-column>
+          <el-table-column label="开始时间" width="200">
+            <template #default="{ row }">{{ formatDateTime(row.start_at) }}</template>
+          </el-table-column>
+          <el-table-column label="结束时间" width="200">
+            <template #default="{ row }">{{ formatDateTime(row.end_at) }}</template>
+          </el-table-column>
+          <el-table-column label="状态" width="120">
+            <template #default="{ row }">
+              <el-tag v-if="isWindowActive(row)" type="warning" size="small">进行中</el-tag>
+              <el-tag v-else-if="new Date(row.end_at) < new Date()" type="info" size="small">已结束</el-tag>
+              <el-tag v-else type="success" size="small">未开始</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="100">
+            <template #default="{ row }">
+              <el-button size="small" type="danger" link @click="handleDeleteMaintenance(row)">
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-else description="暂无维护窗口" :image-size="60" />
+      </el-card>
+
       <!-- 最近检测结果 -->
-      <el-card class="results-card">
+      <el-card class="section-card">
         <template #header>
           <span>最近检测结果</span>
         </template>
@@ -83,10 +168,12 @@
           </el-table-column>
           <el-table-column label="响应时间" prop="response_time" width="120">
             <template #default="{ row }">
-              {{ row.response_time ? row.response_time + 'ms' : '-' }}
+              {{ row.response_time != null ? row.response_time + 'ms' : '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="状态码" prop="status_code" width="100" />
+          <el-table-column label="状态码" prop="status_code" width="100">
+            <template #default="{ row }">{{ row.status_code ?? '-' }}</template>
+          </el-table-column>
           <el-table-column label="错误信息" prop="error_message" show-overflow-tooltip />
           <el-table-column label="检测时间" prop="checked_at" width="180">
             <template #default="{ row }">
@@ -97,7 +184,7 @@
       </el-card>
 
       <!-- 故障事件 -->
-      <el-card class="incidents-card">
+      <el-card class="section-card">
         <template #header>
           <span>故障事件历史</span>
         </template>
@@ -122,6 +209,9 @@
                 <div class="incident-period" v-else>
                   <el-tag type="warning" size="small">进行中</el-tag>
                 </div>
+                <div class="incident-period" v-if="incident.error_message">
+                  {{ incident.error_message }}
+                </div>
               </div>
             </el-card>
           </el-timeline-item>
@@ -129,6 +219,29 @@
         <el-empty v-else description="暂无故障事件" />
       </el-card>
     </div>
+
+    <!-- 添加维护窗口对话框 -->
+    <el-dialog v-model="maintenanceDialog" title="添加维护窗口" width="480px">
+      <el-form label-width="90px">
+        <el-form-item label="名称">
+          <el-input v-model="maintenanceForm.name" placeholder="例如: 系统升级（可选）" />
+        </el-form-item>
+        <el-form-item label="时间范围">
+          <el-date-picker
+            v-model="maintenanceForm.range"
+            type="datetimerange"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            format="YYYY-MM-DD HH:mm"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="maintenanceDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleAddMaintenance">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -139,7 +252,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
 import { loadTimezoneSettings, formatWithSystemTimezone } from '@/utils/timezone'
 import { monitorApi } from '@/api'
-import { Refresh, Edit, Delete } from '@element-plus/icons-vue'
+import { Refresh, Edit, Delete, VideoPlay, Plus, Tools, QuestionFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -148,8 +261,13 @@ const monitor = ref({})
 const stats = ref({})
 const results = ref([])
 const incidents = ref([])
+const maintenanceWindows = ref([])
 const loading = ref(false)
+const checking = ref(false)
 const chartRef = ref(null)
+const chartRange = ref(24)
+const maintenanceDialog = ref(false)
+const maintenanceForm = ref({ name: '', range: null })
 let chartInstance = null
 
 const statusType = computed(() => {
@@ -162,6 +280,7 @@ const statusType = computed(() => {
 })
 
 const statusText = computed(() => {
+  if (monitor.value.inMaintenance) return '维护中'
   if (!monitor.value.enabled) return '已禁用'
   switch (monitor.value.latestStatus) {
     case 'up': return '正常运行'
@@ -169,6 +288,12 @@ const statusText = computed(() => {
     default: return '未知状态'
   }
 })
+
+const pushUrl = computed(() =>
+  monitor.value.push_token
+    ? `${window.location.origin}/api/push/${monitor.value.push_token}`
+    : ''
+)
 
 const formatDateTime = (time) => {
   if (!time) return '-'
@@ -183,6 +308,78 @@ const formatDuration = (seconds) => {
   return `${hours}时${minutes}分${secs}秒`
 }
 
+const isWindowActive = (row) => {
+  const now = Date.now()
+  return new Date(row.start_at) <= now && new Date(row.end_at) >= now
+}
+
+const copyText = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('已复制')
+  } catch {
+    ElMessage.warning('复制失败')
+  }
+}
+
+const handleCheckNow = async () => {
+  checking.value = true
+  try {
+    const res = await monitorApi.checkNow(route.params.id)
+    if (res.success) {
+      ElMessage.success(`检测完成: ${res.data.status === 'up' ? '正常' : '故障'}`)
+      refreshData()
+    }
+  } catch {
+    ElMessage.error('检测失败')
+  } finally {
+    checking.value = false
+  }
+}
+
+const handleAddMaintenance = async () => {
+  const { name, range } = maintenanceForm.value
+  if (!range || range.length !== 2) {
+    ElMessage.warning('请选择时间范围')
+    return
+  }
+  try {
+    const res = await monitorApi.createMaintenance(route.params.id, {
+      name: name || '',
+      start_at: range[0].toISOString(),
+      end_at: range[1].toISOString()
+    })
+    if (res.success) {
+      ElMessage.success('维护窗口已创建')
+      maintenanceDialog.value = false
+      maintenanceForm.value = { name: '', range: null }
+      loadMaintenance()
+    }
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '创建失败')
+  }
+}
+
+const handleDeleteMaintenance = async (row) => {
+  try {
+    await ElMessageBox.confirm('确定删除此维护窗口？', '确认', { type: 'warning' })
+    const res = await monitorApi.deleteMaintenance(row.id)
+    if (res.success) {
+      ElMessage.success('已删除')
+      loadMaintenance()
+    }
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error('删除失败')
+  }
+}
+
+const loadMaintenance = async () => {
+  try {
+    const res = await monitorApi.getMaintenance(route.params.id)
+    if (res.success) maintenanceWindows.value = res.data
+  } catch { /* ignore */ }
+}
+
 const handleDelete = async () => {
   try {
     await ElMessageBox.confirm(
@@ -194,7 +391,7 @@ const handleDelete = async () => {
         type: 'warning'
       }
     )
-    
+
     const res = await monitorApi.delete(route.params.id)
     if (res.success) {
       ElMessage.success('删除成功')
@@ -205,35 +402,26 @@ const handleDelete = async () => {
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除监控项失败:', error)
-      // 响应拦截器已经提取了 response.data，所以 error 可能是字符串或包含 message 的对象
-      let errorMsg = '删除失败'
-      if (typeof error === 'string') {
-        errorMsg = error
-      } else if (error?.message) {
-        errorMsg = error.message
-      } else if (error?.data?.message) {
-        errorMsg = error.data.message
-      }
-      ElMessage.error(errorMsg)
+      ElMessage.error('删除失败')
     }
   }
 }
 
 const initChart = () => {
   if (!chartRef.value) return
+  if (!chartInstance) {
+    chartInstance = echarts.init(chartRef.value)
+  }
 
-  chartInstance = echarts.init(chartRef.value)
-
+  const trend = stats.value.trend || []
   const option = {
     tooltip: {
       trigger: 'axis',
-      axisPointer: {
-        type: 'cross'
-      }
+      axisPointer: { type: 'cross' }
     },
     xAxis: {
       type: 'category',
-      data: stats.value.trend?.map(item => formatDateTime(item.time_slot).slice(5, 16)) || []
+      data: trend.map(item => formatDateTime(item.time_slot).slice(chartRange.value > 24 ? 0 : 5, chartRange.value > 24 ? 10 : 16))
     },
     yAxis: {
       type: 'value',
@@ -243,11 +431,9 @@ const initChart = () => {
       {
         name: '平均响应时间',
         type: 'line',
-        data: stats.value.trend?.map(item => Math.round(item.avg_response_time)) || [],
+        data: trend.map(item => item.avg_response_time != null ? Math.round(item.avg_response_time) : null),
         smooth: true,
-        areaStyle: {
-          opacity: 0.3
-        }
+        areaStyle: { opacity: 0.3 }
       }
     ],
     grid: {
@@ -264,12 +450,11 @@ const initChart = () => {
 const refreshData = async () => {
   loading.value = true
   try {
-    // 先加载时区设置
     await loadTimezoneSettings()
-    
+
     const [monitorRes, statsRes, resultsRes, incidentsRes] = await Promise.all([
       monitorApi.getById(route.params.id),
-      monitorApi.getStats(route.params.id),
+      monitorApi.getStats(route.params.id, chartRange.value),
       monitorApi.getResults(route.params.id, 50),
       monitorApi.getIncidents(route.params.id, 20)
     ])
@@ -292,13 +477,15 @@ const refreshData = async () => {
 
 onMounted(() => {
   refreshData()
-  window.addEventListener('resize', () => {
-    chartInstance?.resize()
-  })
+  loadMaintenance()
+  window.addEventListener('resize', onResize)
 })
+
+const onResize = () => chartInstance?.resize()
 
 onUnmounted(() => {
   chartInstance?.dispose()
+  window.removeEventListener('resize', onResize)
 })
 </script>
 
@@ -343,15 +530,30 @@ onUnmounted(() => {
   color: #409eff;
 }
 
-.chart-card,
-.results-card,
-.incidents-card {
+.section-card {
   margin-bottom: 20px;
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .chart-container {
   width: 100%;
   height: 400px;
+}
+
+.form-help {
+  color: #909399;
+  font-size: 12px;
+}
+
+.form-help code {
+  background: var(--md-surface-variant, #f5f5f5);
+  padding: 1px 6px;
+  border-radius: 4px;
 }
 
 .incident-item {

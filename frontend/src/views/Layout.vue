@@ -43,6 +43,10 @@
           </div>
           <template #dropdown>
             <el-dropdown-menu>
+              <el-dropdown-item command="toggleNotify">
+                <el-icon><Bell /></el-icon>
+                <span>桌面通知：{{ monitorStore.desktopNotify ? '已开启' : '已关闭' }}</span>
+              </el-dropdown-item>
               <el-dropdown-item command="users" v-if="authStore.isAdmin">
                 <el-icon><UserFilled /></el-icon>
                 <span>用户管理</span>
@@ -168,6 +172,17 @@ const handleCommand = async (command) => {
     router.push('/users')
   } else if (command === 'statusPages') {
     router.push('/status-pages')
+  } else if (command === 'toggleNotify') {
+    const enabled = !monitorStore.desktopNotify
+    if (enabled && 'Notification' in window && Notification.permission !== 'granted') {
+      const perm = await Notification.requestPermission()
+      if (perm !== 'granted') {
+        ElMessage.warning('浏览器拒绝了通知权限')
+        return
+      }
+    }
+    monitorStore.setDesktopNotify(enabled)
+    ElMessage.success(enabled ? '已开启故障桌面通知' : '已关闭桌面通知')
   }
 }
 
